@@ -1,0 +1,122 @@
+@import url("https://fonts.googleapis.com/css2?family=Charis+SIL:ital,wght@0,400;0,700;1,400;1,700&family=Pixelify+Sans:wght@400..700&display=swap");
+
+:root {
+  --bg-color: #181c14;
+  --input-color: #3c3d37;
+  --accent-color1: #697565;
+  --accent-color2: #ecdfcc;
+  --global-font: "Charis SIL";
+  --main-height: 850px;
+  --chat-width: 750px;
+  --prompt-width: 750px;
+  --prompt-height: 50px;
+}
+
+header {
+  font: var(--global-font), serif;
+  font-size: 4em;
+  background-color: var(--bg-color);
+  text-align: center;
+}
+
+nav {
+  font: var(--global-font), serif;
+  padding: 0px 0px 20px;
+  /*background-color: var(--accent-color1);*/
+}
+
+body {
+  font: var(--global-font), serif;
+  background-color: var(--bg-color);
+}
+
+footer {
+  font: var(--global-font), serif;
+  background-color: var(--accent-color2);
+  position: absolute;
+  bottom: 0;
+  width: 100%;
+  color: black;
+}
+
+/* Class used for messages  */
+div.container {
+  background-color: var(--accent-color2);
+  min-height: 50px;
+  color: black;
+}
+
+#main {
+  display: flex;
+  gap: 9em;
+  justify-content: left;
+  position: relative;
+  min-height: var(--main-height);
+  width: 100%;
+}
+
+#prompt-area {
+  font: var(--global-font);
+  font-size: 1.5em;
+  outline: solid var(--accent-color1);
+  height: 3em;
+  align-content: left;
+  position: fixed;
+  bottom: 105px;
+  width: var(--prompt-width);
+  height: var(--prompt-height);
+  background-color: var(--input-color);
+  border-radius: 7px;
+  overflow: scroll;
+}
+
+#message-container {
+  font: var(--global-font);
+  display: flex;
+  flex-direction: column;
+  position: fixed;
+  bottom: 200px;
+  width: var(--prompt-width);
+  outline: solid var(--accent-color1);
+  align-content: left;
+  border-radius: 7px;
+  max-height: 500px;
+  overflow: scroll;
+  gap: 10px;
+}
+
+#io-area {
+  display: grid;
+  padding: 10px 20px 10px;
+}
+
+#chat-history {
+  display: grid;
+  height: var(--chat-width);
+  width: 450px;
+  outline: solid var(--accent-color1);
+  align-content: left;
+  border-radius: 7px;
+}
+
+/* Class used for functional buttons */
+.btn-default {
+  font: var(--global-font);
+  background-color: var(--accent-color1);
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5em;
+  font-size: 25px;
+  border-radius: 5px;
+}
+
+.btn-default:hover {
+  outline: 0.1rem var(--accent-color2) solid;
+}
+
+#message-container>.container {
+  font: var(--global-font);
+  outline: solid var(--accent-color1);
+  align-content: left;
+  border-radius: 7px;
+}
