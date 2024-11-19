@@ -1,19 +1,30 @@
 @import url("https://fonts.googleapis.com/css2?family=Charis+SIL:ital,wght@0,400;0,700;1,400;1,700&family=Pixelify+Sans:wght@400..700&display=swap");
 
 :root {
-  --bg-color: #181c14;
-  --input-color: #3c3d37;
-  --accent-color1: #697565;
-  --accent-color2: #ecdfcc;
+  --bg-color: #1a1b1e;
+  --secondary-bg-color: #2c2d31;
+  --accent-color1: #4a4b50;
+  --accent-color2: #9ca0a8;
   --global-font: "Charis SIL";
   --main-height: 850px;
   --chat-width: 750px;
+  --history-height: 550px;
   --prompt-width: 750px;
   --prompt-height: 50px;
 }
 
+hr {
+  display: block;
+  height: 1px;
+  border: 0;
+  border-top: 1px solid var(--accent-color2);
+  margin: 1em 0;
+  padding: 0;
+}
+
 header {
   font: var(--global-font), serif;
+  color: white;
   font-size: 4em;
   background-color: var(--bg-color);
   text-align: center;
@@ -21,34 +32,58 @@ header {
 
 nav {
   font: var(--global-font), serif;
-  padding: 0px 0px 20px;
-  /*background-color: var(--accent-color1);*/
+  color: var(--accent-color2);
+  display: flex;
+  justify-content: space-between;
+  padding: 10px 50px 20px;
+}
+
+nav h1 {
+  font: var(--global-font), serif;
+  color: var(--accent-color2);
+  font-size: 2em;
 }
 
 body {
-  font: var(--global-font), serif;
   background-color: var(--bg-color);
+  height: 100%;
+  overflow: hidden;
+  scroll-behavior: smooth;
 }
 
 footer {
-  font: var(--global-font), serif;
-  background-color: var(--accent-color2);
-  position: absolute;
+  position: fixed;
   bottom: 0;
+  background-color: var(--secondary-bg-color);
+  color: var(--accent-color2);
+  position: absolute;
   width: 100%;
-  color: black;
+}
+
+#credits {
+  font: var(--global-font), serif;
+  color: var(--accent-color2);
+  font-size: 1em;
 }
 
 /* Class used for messages  */
 div.container {
-  background-color: var(--accent-color2);
-  min-height: 50px;
-  color: black;
+  font: var(--global-font);
+  color: var(--accent-color2);
+  font: var(--global-font);
+  background-color: var(--secondary-bg-color);
+  margin: 15px;
+  padding: 10px 15px 15px;
+  white-space: normal;
+  overflow-wrap: break-word;
+  word-break: break-word;
+  align-content: left;
+  border-radius: 7px;
 }
 
 #main {
   display: flex;
-  gap: 9em;
+  gap: 20em;
   justify-content: left;
   position: relative;
   min-height: var(--main-height);
@@ -56,20 +91,31 @@ div.container {
 }
 
 #prompt-area {
-  font: var(--global-font);
-  font-size: 1.5em;
-  outline: solid var(--accent-color1);
+  color: var(--accent-color2);
   height: 3em;
   align-content: left;
   position: fixed;
   bottom: 105px;
   width: var(--prompt-width);
   height: var(--prompt-height);
-  background-color: var(--input-color);
-  border-radius: 7px;
-  overflow: scroll;
+  background-color: var(--secondary-bg-color);
+  border-radius: 100px;
+  overflow-y: scroll;
 }
 
+#prompt {
+  font: var(--global-font);
+  font-size: 1.25em;
+  padding-left: 15px;
+  padding-top: 10px;
+  width: var(--prompt-width) - 50px;
+  white-space: normal;
+  overflow-wrap: break-word;
+  word-break: break-word;
+  outline: none;
+}
+
+/* Container that holds all messages */
 #message-container {
   font: var(--global-font);
   display: flex;
@@ -77,7 +123,6 @@ div.container {
   position: fixed;
   bottom: 200px;
   width: var(--prompt-width);
-  outline: solid var(--accent-color1);
   align-content: left;
   border-radius: 7px;
   max-height: 500px;
@@ -90,33 +135,63 @@ div.container {
   padding: 10px 20px 10px;
 }
 
+/* Contains all history logs for current user */
 #chat-history {
-  display: grid;
-  height: var(--chat-width);
-  width: 450px;
+  display: flex;
+  flex-direction: column-reverse;
+  height: var(--history-height);
+  width: 300px;
+  justify-content: start;
+  align-items: center;
+  overflow-y: scroll;
+}
+
+/* Class for logging user's history */
+div.history-log {
+  font-size: 17px;
+  width: 250px;
+  background-color: var(--secondary-bg-color);
   outline: solid var(--accent-color1);
-  align-content: left;
-  border-radius: 7px;
+  color: var(--accent-color2);
+  text-align: left;
+  border-radius: 5px;
+  margin: 10px;
+  padding: 10px 15px 15px;
+  white-space: normal;
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+
+#history-text {
+  font: var(--global-font);
+  font-size: 2.5em;
+  color: var(--accent-color2);
+  text-align: center;
+}
+
+#history-area {
+  display: grid;
+  align-items: center;
+  justify-content: center;
+  max-height: var(--history-height);
 }
 
 /* Class used for functional buttons */
 .btn-default {
   font: var(--global-font);
-  background-color: var(--accent-color1);
+  background-color: var(--bg-color);
+  color: var(--accent-color2);
   align-items: center;
   justify-content: center;
   font-size: 1.5em;
-  font-size: 25px;
   border-radius: 5px;
+  border: 0;
+  transition:
+    background-color 0.3s ease,
+    outline 0.3s ease;
 }
 
 .btn-default:hover {
-  outline: 0.1rem var(--accent-color2) solid;
-}
-
-#message-container>.container {
-  font: var(--global-font);
-  outline: solid var(--accent-color1);
-  align-content: left;
-  border-radius: 7px;
+  outline: 0.1rem var(--accent-color1) solid;
+  background-color: var(--secondary-bg-color);
 }
