@@ -2,9 +2,12 @@
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
   "description": "Capability for the main window",
-  "windows": ["main"],
-  "permissions": [
-    "core:default",
-    "shell:allow-open"
-  ]
+  "windows": [
+    "main"
+  ],
+  "permissions": [{ 
+    "identifier": "http:default",
+    "allow": [{ "url": "https://127.0.0.1:*" }],
+    "deny": [{ "url": "https://private.tauri.app" }]
+  }]
 }

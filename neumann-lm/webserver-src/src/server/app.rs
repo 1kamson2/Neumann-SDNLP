@@ -22,7 +22,7 @@ impl Server {
         })
     }
 
-    // this macro makes it act like synchronous function, but still allows to call async functions. 
+    // this macro makes it act like synchronous function, but still allows to call async functions.
     #[tokio::main]
     pub async fn run(&mut self) {
         let listener = TcpListener::bind(&self.addr).await.unwrap();
@@ -42,21 +42,28 @@ impl Server {
 }
 async fn handle_connection(mut stream: TcpStream) {
     // what is the request?
-    let mut request = BufReader::new(&mut stream);
+    let mut streamb = BufReader::new(&mut stream);
     // read the http request
     let mut buffer: String = String::new();
-    request.read_line(&mut buffer).await;
-    let (status, filename) = if buffer == "GET / HTTP/1.1" {
-        ("HTTP/1.1 200 OK", "../site-src/index.html")
+    streamb.read_line(&mut buffer).await;
+    println!("HTTP REQUEST: {}", buffer);
+    let (status, response) = if buffer.trim() == "POST / HTTP/1.1" {
+        ("HTTP/1.1 200", "Hello world!")
     } else {
-        ("HTTP/1.1 404 NOT FOUND", "../site-src/index.html")
+        ("HTTP/1.1 404 NOT FOUND", "Not Hello World!")
     };
-    handle_response(&mut stream, status, filename).await;
+    // streamb.read_line(&mut buffer).await; // read next line, it appends to
+    // buffer which is string, do nice way to handle the text.
+    handle_response(&mut stream, status, response).await;
 }
 
-async fn handle_response(stream: &mut TcpStream, status: &str, filename: &str) {
-    let content = fs::read_to_string(filename).unwrap();
+async fn handle_response(stream: &mut TcpStream, status: &str, response: &str) {
+    //let content = fs::read_to_string(response).unwrap();
+    let content = response;
     let sz = content.len();
-    let response = format!("{status}\r\nContent-Length: {sz}\r\n\r\n{content}");
+    let response = format!(
+        "{status}\r\nAccess-Control-Allow-Origin: *\r\nContent-Length: {sz}\r\n\r\n{content}"
+    );
+    println!("Sending the following reponse:\n{}", response);
     stream.write_all(response.as_bytes()).await.unwrap();
 }

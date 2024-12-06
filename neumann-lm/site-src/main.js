@@ -54,7 +54,30 @@ class EventHandler {
     }
   }
 
-  processMessage(event) {
+  async POSTRequest(data) {
+    try {
+      const response = await fetch("http://127.0.0.1:8000/", {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'text/plain',
+        },
+        body: data.toString()
+      });
+
+      if (!response.ok) {
+        console.log("What data we got: ", response);
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      return await response.text();
+    } catch (error) {
+      console.error('Error sending message:', error);
+      throw error;
+    }
+  }
+
+
+  async processMessage(event) {
     if (event.key === "Enter") {
       event.preventDefault();
       console.log(
@@ -62,6 +85,15 @@ class EventHandler {
         ": User typed the following prompt:\n" +
         userInput.innerText,
       );
+      // should sending message be here, before innerText reset
+      // make sure that this app is connected to our server
+      try {
+        const data = await this.POSTRequest(userInput.innerText);
+        console.log(data);
+      } catch (error) {
+        console.log(error);
+      }
+      // assume that this is response
       const mdiv = document.createElement("div");
       mdiv.classList.add("container");
       const content = document.createTextNode(userInput.innerText);
