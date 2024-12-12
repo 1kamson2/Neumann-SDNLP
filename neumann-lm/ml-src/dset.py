@@ -19,6 +19,28 @@ class DataType(Enum):
     TEST = 2
 
 
+class Language(Enum):
+    EN = "en"
+    DE = "de"
+
+
+def add_pos_encoding(embedded_text, embed) -> None:
+    d_model = embed
+    is_odd = d_model % 2 != 0
+    n = 10000
+    # How much embedding, length of each embedding
+    cnt_emb, len_emb = embedded_text.shape
+    for pos in range(cnt_emb):
+        pos_enc = [0] * len_emb
+        for i in range(d_model // 2):
+            pos_enc[2 * i] = np.sin(pos / n ** (2 * i / d_model))
+            pos_enc[2 * i + 1] = np.cos(pos / n ** (2 * i / d_model))
+        if is_odd:
+            pos_enc[d_model - 1] = np.sin(pos / n ** (2 * (d_model - 1) / d_model))
+        pos_enc = np.array(pos_enc, dtype=np.float32)
+        embedded_text[pos] += pos_enc
+
+
 class NLPDataset(Dataset):
     def __init__(self, data_flag):
         super().__init__()
@@ -52,13 +74,10 @@ class NLPDataset(Dataset):
             len(self.data_path) != 0 and "Not implemented" not in self.data_path
         ), "Assertion failed: Neumann couldn't load your data set."
 
-        # We are looking for output of tuples: iembedding = [(..., ...), ...]
+        print("########## LOADING DATA ##########")
         iembedding = []
         for translation in (
-            row
-            for row in pd.read_csv(self.data_path, lineterminator="\n")
-            .head(10)
-            .itertuples()
+            row for row in pd.read_csv(self.data_path, lineterminator="\n").itertuples()
         ):
 
             idx, de, en = translation
@@ -66,18 +85,19 @@ class NLPDataset(Dataset):
                 print(
                     f"[WARNING] This input doesn't meet requirements, length is"
                     " less or equal than 1.\n"
-                    f"Index:  {idx}\nde: {de}\nen: {en}\n"
-                    f"Length: \nde: {len(de)}\nen: {len(en)}\n"
+                    f"Index: {idx} de: {de} en: {en}\n"
+                    f"Length: de: {len(de)} en: {len(en)}\n"
                 )
             else:
-                print(
-                    f"Index: {idx}\nde: {de}\nen: {en}\n"
-                    f"Length: \nde: {len(de)}\nen: {len(en)}\n"
-                )
+                print(f"Index: {idx}\n" f"Length: de: {len(de)} en: {len(en)}\n")
                 en_proc = self.preprocess_text(en, EN_WORD_EMBEDDING_LENGTH)
                 de_proc = self.preprocess_text(en, DE_WORD_EMBEDDING_LENGTH)
-                iembedding.append((en_proc, de_proc))
-        # Return doesn't work for now.
+                add_pos_encoding(en_proc, EN_WORD_EMBEDDING_LENGTH)
+                add_pos_encoding(de_proc, DE_WORD_EMBEDDING_LENGTH)
+                iembedding.append(
+                    dict(en=torch.from_numpy(en_proc), de=torch.from_numpy(de_proc))
+                )
+
         return np.array(iembedding)
 
     def preprocess_text(self, text, emb_type):
@@ -86,18 +106,22 @@ class NLPDataset(Dataset):
         not restricted to any hardcoded size. Length of word embedding depends
         on what we try to embed.
         """
+        # todo: weird out of range index error.
         embedded_text = list()
         text = text.split(" ")
         for word in text:
-            for c in word:
-                ec = [0] * emb_type
-                i = 0
-                for b in bin(ord(c))[2::]:
-                    if b == "1":
-                        ec[i] = 1
-                    i += 1
-                embedded_text.append(ec)
-        return np.array(embedded_text, dtype=np.int32)
+            try:
+                for c in word:
+                    ec = [0] * emb_type
+                    i = 0
+                    for b in bin(ord(c))[2::]:
+                        if b == "1":
+                            ec[i] = 1
+                        i += 1
+                    embedded_text.append(ec)
+            except IndexError as e:
+                print(e)
+        return np.array(embedded_text, dtype=np.float32)
 
     def __getitem__(self, index):
         return self.data_set[index]

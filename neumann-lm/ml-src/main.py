@@ -1,13 +1,10 @@
-import numpy as np
-import pandas as pd
-import matplotlib.pyplot as plt
-import torch
-import torchvision
 from dset import *
+from nlp_training import NLP
 
 
 def main():
-    dset = NLPDataset(DataType.TRAINING)
+    nlp = NLP()
+    nlp.training(1)
 
 
 if __name__ == "__main__":
