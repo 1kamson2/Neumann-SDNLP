@@ -1,134 +1,198 @@
+import math
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import copy
+
+
+class Generator(nn.Module):
+    def __init__(self, d_model, vocab):
+        super().__init__()
+        self.proj = nn.Linear(d_model, vocab)
+
+    def forward(self, x):
+        return torch.log_softmax(self.proj(x), dim=-1)
+
+
+class LayerNorm(nn.Module):
+    def __init__(self, features, eps=1e-6):
+        super().__init__()
+        """
+        Create Layer normalization for Transformer. Using ones for a and zeros
+        for b because they are at first neutral. Using nn.Parameter(...) to make
+        it trainable.
+        """
+        self.a = nn.Parameter(torch.ones(features))
+        self.b = nn.Parameter(torch.zeros(features))
+        self.eps = eps
+
+    def forward(self, x):
+        mean = x.mean(-1, keepdim=True)
+        std = x.std(-1, keepdim=True)
+        return self.b + self.a * (x - mean) / (std + self.eps)
+
+
+class SublayerCon(nn.Module):
+    def __init__(self, sz, dropout=0.1):
+        super().__init__()
+        self.norm = LayerNorm(sz)
+        self.dropout = nn.Dropout(dropout)
+
+    def forward(self, x, sublayer):
+        return x + self.dropout(sublayer(self.norm(x)))
+
+
+class EncoderLayer(nn.Module):
+    def __init__(self, sz, attn, ffn, dropout, n=2):
+        super().__init__()
+        self.sz = sz
+        self.attn = attn
+        self.ffn = ffn
+        self.sublayer = nn.ModuleList(
+            [copy.deepcopy(SublayerCon(sz, dropout)) for _ in range(n)]
+        )
+
+    def forward(self, x, mask):
+        x = self.sublayer[0](x, lambda x: self.attn(x, x, x, mask))
+        return self.sublayer[1](x, self.ffn)
 
 
 class NLPEncoder(nn.Module):
-    def __init__(self, in_features, out_features):
+    def __init__(self, layer, N):
         super().__init__()
+        """
+        Main Encoder class, holds layers.
+        """
         self.use_cuda = torch.cuda.is_available()
         self.device = torch.device("cuda" if self.use_cuda else "cpu")
-        # [FIX] todo: Check initialization, because it doesnt have to be correct.
-        self.mha = MultiHeadAttention(in_features, in_features, in_features, 8)
-        self.ffn = FeedForwardNetwork(in_features, 2 * in_features)
+        self.layers = nn.ModuleList([copy.deepcopy(layer) for _ in range(N)])
+        self.norm = LayerNorm(layer.size)
 
-    def forward(self, ex, q, k, v, valid_lens):
-        out = ex + self.mha(q, k, v, valid_lens)
-        out = nn.LayerNorm(out.shape[-1])(out)
-        out = out + self.ffn(out)
-        return out.to(self.device)
+    def forward(self, x, mask):
+        for layer in self.layers:
+            x = layer(x, mask)
+        return self.norm(x).to(self.device)
+
+
+class DecoderLayer(nn.Module):
+    def __init__(self, sz, attn, src_attn, ffn, dropout=0.1, n=3):
+        super().__init__()
+        self.sz = sz
+        self.attn = attn
+        self.src_attn = src_attn
+        self.ffn = ffn
+        self.sublayer = nn.ModuleList(
+            [copy.deepcopy(SublayerCon(sz, dropout)) for _ in range(n)]
+        )
+
+    def forward(self, x, mem, src_mask, trg_mask):
+        x = self.sublayer[0](x, lambda x: self.attn(x, x, x, trg_mask))
+        x = self.sublayer[1](x, lambda x: self.src_attn(x, mem, mem, src_mask))
+        return self.sublayer[2](x, self.ffn)
 
 
 class NLPDecoder(nn.Module):
-    def __init__(self, in_features):
+    def __init__(self, layer, N):
         super().__init__()
         self.use_cuda = torch.cuda.is_available()
         self.device = torch.device("cuda" if self.use_cuda else "cpu")
-        self.mha = MultiHeadAttention(in_features, in_features, in_features, 8)
-        self.ffn = FeedForwardNetwork(in_features, 2 * in_features)
+        self.layers = nn.ModuleList([copy.deepcopy(layer) for _ in range(N)])
+        self.norm = LayerNorm(layer.size)
 
-    def forward(self, dx, ex):
-        out = dx + self.mha(ex, ex, dx, None)
-        out = nn.LayerNorm(out.shape[-1])(out)
-        # [FIX] ?? shoud add to k / v / q ????????????
-        # [FIX] Layer norm seems retarded
-        out = out + self.mha(out + ex, ex, dx, None)
-        out = nn.LayerNorm(out.shape[-1])(out)
-        out = out + self.ffn(out)
-        out = nn.LayerNorm(out.shape[-1])(out)
-        return out.to(self.device)
+    def forward(self, x, mem, src_mask, trg_mask):
+        for layer in self.layers:
+            x = layer(x, mem, src_mask, trg_mask)
+        return self.norm(x)
 
 
 class Transformer(nn.Module):
-    def __init__(self, in_features, out_features):
+    def __init__(self, encoder, decoder, src_embed, trg_embed, generator):
         super().__init__()
         self.use_cuda = torch.cuda.is_available()
         self.device = torch.device("cuda" if self.use_cuda else "cpu")
-        self.encoder = NLPEncoder(in_features, out_features)
-        self.decoder = NLPDecoder(in_features)
-        # [FIX] certainly bad
-        self.lin = nn.Linear(16, 16)
+        self.encoder = encoder
+        self.decoder = decoder
+        self.src_embed = src_embed
+        self.trg_embed = trg_embed
+        self.generator = generator
 
-    def forward(self, dx, ex):
-        print("Encoder start.")
-        ex = self.encoder(ex, ex, ex, dx, None)
-        print("Encoder stop.")
-        print("Decoder start.")
+    """
+    Helper functions
+    """
 
-        # [FIX] Fix this hardcode, it should depend on batch size, also this is
-        # the idea of transformer? I think not, rethink this.
-        # [FIX] It doesnt work for now with bigger batches.
-        # out = self.decoder(dx, ex.expand(-1, -1, 31, -1))
-        out = self.decoder(dx, ex)
-        print("Decoder stop.")
-        out = self.lin(out)
-        out = nn.Softmax()(out)
-        return out.to(self.device)
+    def encode(self, src, src_mask):
+        return self.encoder(self.src_embed(src), src_mask)
 
+    def decode(self, mem, src_mask, trg, trg_mask):
+        self.encoder(self.trg_embed(trg), mem, src_mask, trg_mask)
 
-"""
-[FIX]
-100% WON'T WORK THIS SHIT BELOW, FUCKING PIECE OF SHIT
-INPUT SHOULD BE THE LENGTH OF THE EMBEDDING IN THIS CASE IT IS 7 OR 8
-IF IT WAS ONE HOT ENCODING IT WOULD BE 128 OR 256
-https://pytorch.org/docs/stable/generated/torch.nn.Linear.html
-"""
+    def forward(self, src, trg, src_mask, trg_mask):
+        return self.decode(self.encode(src, src_mask), src_mask, trg, trg_mask)
 
 
 class MultiHeadAttention(nn.Module):
-    def __init__(self, k_sz, q_sz, v_sz, num_heads, dropout=0.1, bias=False):
+    def __init__(self, h, d_model, dropout=0.1, need_mask=False):
         super().__init__()
+        assert d_model == h * 8, f"[ERROR] Model dimension doesn't match your"
+        f"parallel attention layers"
         self.use_cuda = torch.cuda.is_available()
         self.device = torch.device("cuda" if self.use_cuda else "cpu")
-        self.num_heads = num_heads
-        # Weights of each layer
-        self.WL_k = nn.Linear(k_sz, k_sz * num_heads, bias=bias)
-        self.WL_q = nn.Linear(q_sz, q_sz * num_heads, bias=bias)
-        self.WL_v = nn.Linear(v_sz, v_sz * num_heads, bias=bias)
-        self.dropout = dropout
-        # Output layer - fully connected layer
-        # [FIX] should use d_model = 7 or 8 for better clarity
-        self.fc = nn.Linear(524288, v_sz, bias=bias)
+        self.dim_k = d_model // h
+        self.h = h
+        self.linears = nn.ModuleList(
+            [copy.deepcopy(nn.Linear(d_model, d_model)) for _ in range(4)]
+        )
+        self.dropout = nn.Dropout(dropout)
+        self.need_mask = need_mask
 
-    def forward(self, q, k, v, valid_lens=None):
-        q = self._transpose(self.WL_q(q), self.num_heads)
-        k = self._transpose(self.WL_k(k), self.num_heads)
-        v = self._transpose(self.WL_v(v), self.num_heads)
-        if valid_lens is not None:
-            valid_lens = torch.repeat_interleave(
-                valid_lens, repeats=self.num_heads, dim=0
-            )
-        # [FIX] For now use this, but later do your own version
-        print(q.shape, k.shape, v.shape)
-        output = F.scaled_dot_product_attention(q, k, v, valid_lens, self.dropout)
-        output_concat = self._transpose_output(output, self.num_heads)
-        output_concat = self.fc(output_concat)
-        return output_concat.to(self.device)
+    def sub_mask(self, sz):
+        attn_shape = (1, sz, sz)
+        return torch.triu(torch.ones(attn_shape), diagonal=1).type(torch.uint8)
 
-    def _transpose(self, X, num_heads):
-        X = X.reshape(X.shape[0], X.shape[1], num_heads, -1)
-        X = X.permute(0, 2, 1, 3)
-        return X.reshape(-1, X.shape[2], X.shape[3])
+    def get_attn(self, q, k, v):
+        """
+        Compute Scaled Dot Product Attention for set of queries, keys and
+        values. It accepts also mask, mainly for decoder.
+        """
+        dim_k = q.shape[-1]
+        k_t = k.transpose(-2, -1)
+        qk_t = torch.matmul(q, k_t)
+        attn = qk_t / math.sqrt(dim_k)
+        if self.need_mask:
+            attn = attn.masked_fill(self.sub_mask(attn.shape[-1]) == 0, -1e9)
+        sattn = attn.softmax(dim=-1)
+        sattn = self.dropout(sattn)
+        return torch.matmul(sattn, v), sattn
 
-    def _transpose_output(self, X, num_heads):
-        X = X.reshape(-1, num_heads, X.shape[1], X.shape[2])
-        X = X.permute(0, 2, 1, 3)
-        return X.reshape(X.shape[0], X.shape[1], -1)
+    def forward(self, q, k, v):
+        if self.need_mask:
+            mask = self.sub_mask(q.shape[-1])
+            mask = mask.unsqueeze(1)
+        nbatch = q.shape[0]
+        q, k, v = [
+            lin(x).view(nbatch, -1, self.h, self.dim_k).transpose(1, 2)
+            for lin, x in zip(self.linears, (q, k, v))
+        ]
+        x, self.attn = self.get_attn(q, k, v)
+
+        x = x.transpose(1, 2).contiguous().view(nbatch, -1, self.h * self.dim_k)
+        return self.linears[-1](x)
 
 
 class FeedForwardNetwork(nn.Module):
-    def __init__(self, dim_in, dim_hidout, dropout=0.1):
+    def __init__(self, dim_model, dim_ffnout, dropout=0.1):
         super().__init__()
         self.use_cuda = torch.cuda.is_available()
         self.device = torch.device("cuda" if self.use_cuda else "cpu")
-        self.w1 = nn.Linear(dim_in, dim_hidout)
-        self.w2 = nn.Linear(dim_hidout, dim_in)
+        self.w1 = nn.Linear(dim_model, dim_ffnout)
+        self.w2 = nn.Linear(dim_ffnout, dim_model)
         self.dropout = nn.Dropout(dropout)
 
     def forward(self, x):
-        out = self.w2((self.w1(x)))
+        out = self.w1(x)
+        out = F.relu(out)
         out = self.dropout(out)
-        return out.to(self.device)
+        return self.w2(out).to(self.device)
 
 
 """
