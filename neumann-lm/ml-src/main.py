@@ -4,7 +4,7 @@ from nlp_training import NLP
 
 def main():
     nlp = NLP()
-    nlp.training(1)
+    nlp.run_epoch()
 
 
 if __name__ == "__main__":

@@ -66,7 +66,7 @@ class NLPEncoder(nn.Module):
         self.use_cuda = torch.cuda.is_available()
         self.device = torch.device("cuda" if self.use_cuda else "cpu")
         self.layers = nn.ModuleList([copy.deepcopy(layer) for _ in range(N)])
-        self.norm = LayerNorm(layer.size)
+        self.norm = LayerNorm(layer.sz)
 
     def forward(self, x, mask):
         for layer in self.layers:
@@ -97,7 +97,7 @@ class NLPDecoder(nn.Module):
         self.use_cuda = torch.cuda.is_available()
         self.device = torch.device("cuda" if self.use_cuda else "cpu")
         self.layers = nn.ModuleList([copy.deepcopy(layer) for _ in range(N)])
-        self.norm = LayerNorm(layer.size)
+        self.norm = LayerNorm(layer.sz)
 
     def forward(self, x, mem, src_mask, trg_mask):
         for layer in self.layers:
@@ -124,16 +124,21 @@ class Transformer(nn.Module):
         return self.encoder(self.src_embed(src), src_mask)
 
     def decode(self, mem, src_mask, trg, trg_mask):
-        self.encoder(self.trg_embed(trg), mem, src_mask, trg_mask)
+        self.decoder(self.trg_embed(trg), mem, src_mask, trg_mask)
 
     def forward(self, src, trg, src_mask, trg_mask):
         return self.decode(self.encode(src, src_mask), src_mask, trg, trg_mask)
 
 
+def sub_mask(sz):
+    attn_shape = (1, sz, sz)
+    return torch.triu(torch.ones(attn_shape), diagonal=1).type(torch.uint8)
+
+
 class MultiHeadAttention(nn.Module):
     def __init__(self, h, d_model, dropout=0.1, need_mask=False):
         super().__init__()
-        assert d_model == h * 8, f"[ERROR] Model dimension doesn't match your"
+        assert d_model == h * 64, f"[ERROR] Model dimension doesn't match your"
         f"parallel attention layers"
         self.use_cuda = torch.cuda.is_available()
         self.device = torch.device("cuda" if self.use_cuda else "cpu")
@@ -145,10 +150,6 @@ class MultiHeadAttention(nn.Module):
         self.dropout = nn.Dropout(dropout)
         self.need_mask = need_mask
 
-    def sub_mask(self, sz):
-        attn_shape = (1, sz, sz)
-        return torch.triu(torch.ones(attn_shape), diagonal=1).type(torch.uint8)
-
     def get_attn(self, q, k, v):
         """
         Compute Scaled Dot Product Attention for set of queries, keys and
@@ -159,14 +160,14 @@ class MultiHeadAttention(nn.Module):
         qk_t = torch.matmul(q, k_t)
         attn = qk_t / math.sqrt(dim_k)
         if self.need_mask:
-            attn = attn.masked_fill(self.sub_mask(attn.shape[-1]) == 0, -1e9)
+            attn = attn.masked_fill(sub_mask(attn.shape[-1]) == 0, -1e9)
         sattn = attn.softmax(dim=-1)
         sattn = self.dropout(sattn)
         return torch.matmul(sattn, v), sattn
 
     def forward(self, q, k, v):
         if self.need_mask:
-            mask = self.sub_mask(q.shape[-1])
+            mask = sub_mask(q.shape[-1])
             mask = mask.unsqueeze(1)
         nbatch = q.shape[0]
         q, k, v = [
@@ -177,6 +178,35 @@ class MultiHeadAttention(nn.Module):
 
         x = x.transpose(1, 2).contiguous().view(nbatch, -1, self.h * self.dim_k)
         return self.linears[-1](x)
+
+
+class Embeddings(nn.Module):
+    def __init__(self, d_model, vocab):
+        super(Embeddings, self).__init__()
+        self.lut = nn.Embedding(vocab, d_model)
+        self.d_model = d_model
+
+    def forward(self, x):
+        return self.lut(x) * math.sqrt(self.d_model)
+
+
+class PositionalEncoding(nn.Module):
+    def __init__(self, d_model, dropout, max_len=5000):
+        super(PositionalEncoding, self).__init__()
+        self.dropout = nn.Dropout(p=dropout)
+        pe = torch.zeros(max_len, d_model)
+        position = torch.arange(0, max_len).unsqueeze(1)
+        div_term = torch.exp(
+            torch.arange(0, d_model, 2) * -(math.log(10000.0) / d_model)
+        )
+        pe[:, 0::2] = torch.sin(position * div_term)
+        pe[:, 1::2] = torch.cos(position * div_term)
+        pe = pe.unsqueeze(0)
+        self.register_buffer("pe", pe)
+
+    def forward(self, x):
+        x = x + self.pe[:, : x.size(1)].requires_grad_(False)
+        return self.dropout(x)
 
 
 class FeedForwardNetwork(nn.Module):
@@ -193,9 +223,3 @@ class FeedForwardNetwork(nn.Module):
         out = F.relu(out)
         out = self.dropout(out)
         return self.w2(out).to(self.device)
-
-
-"""
-TODO: Add masked attention, for now skipped
-
-"""

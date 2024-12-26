@@ -1,48 +1,135 @@
-from nns import NLPEncoder, Transformer
+from nlp import *
 from dset import *
 from torch.utils.data import DataLoader
 import torch
 import torch.nn as nn
-from torch.optim.sgd import SGD
+from torch.optim import Adam
+from torch.optim.lr_scheduler import LambdaLR
+import time
 
 
 class NLP:
-    def __init__(self, lr=0.001, momentum=0.99):
-        self.sth = "Something should be here"
-        self.lr = lr
-        self.momentum = momentum
-        self.model = Transformer(16, 16)
-        self.optimizer = SGD(
-            self.model.parameters(), lr=self.lr, momentum=self.momentum
-        )
-        self.dataset = NLPDataset(
-            DataType.TRAINING,
-            Language.SRC,
-            Language.TRG,
-            EN_WORD_EMBEDDING_LENGTH,
-            DE_WORD_EMBEDDING_LENGTH,
-        )
-        # [FIX] Shit doesnt work if batch size is bigger than 1
-        # self.batch_sz = 32
-        # The problem with ex which after encoder is of size [248, 1, ...]
-        self.batch_sz = 1
+    def __init__(
+        self, N=6, d_model=512, d_ffn=2048, h=8, dropout=0.1
+    ):
+        """
+        There should be easier and faster way to copy layers / networks in
+        torch, because deep copy is really expensive operation and very slow.
+        """
+        # --- Initialize parameters for the batch training --- #
+        # 1. Get vocabs. 
+        vocab_src, vocab_trg = Tokenizer.get_vocab()
+        # 2. Get lens.
+        voclen_src, voclen_trg = len(vocab_src), len(vocab_trg)
+        # 3. Get tokens. 
+        vocab2dec, vocab2enc = Tokenizer.get_tokens() # (trg, src)
 
-    def training(self, nepoch):
-        dl = DataLoader(dataset=self.dataset, batch_size=self.batch_sz, shuffle=True)
-        loss_fn = nn.CrossEntropyLoss()
-        self.model.train()
-        # nbatch = 0
-        for epoch in range(nepoch):
-            for data in dl:
-                print(data["target"].shape, data["source"].shape)
-                pred = self.model(data["target"], data["source"])
-                print(pred.shape, pred)
+        # --- Initialize Layers for Transformer --- #
+        c = copy.deepcopy
+        self.attn = MultiHeadAttention(h, d_model)
+        self.ffn = FeedForwardNetwork(d_model, d_ffn, dropout)
+        self.pos = PositionalEncoding(d_model, dropout)
+        self.generator = Generator(d_model, voclen_trg)
+        self.padding_idx = vocab_trg["<blank>"]
+        self.model = Transformer(
+            NLPEncoder(EncoderLayer(d_model, c(self.attn), c(self.ffn), dropout), N),
+            NLPDecoder(
+                DecoderLayer(d_model, c(self.attn), c(self.attn), c(self.ffn), dropout),
+                N,
+            ),
+            nn.Sequential(Embeddings(d_model, voclen_src), c(self.pos)),
+            nn.Sequential(Embeddings(d_model, voclen_trg), c(self.pos)),
+            self.generator
+        )
+        # --- Initialize variables for epoch tracking --- #
+        self.nepoch = 32
+        self.warmup = 400
+        self.factor = 1.0 
+        self.step = 0
+        self.accum_step = 0
+        self.samples = 0
+        self.tokens = 0
+        self.factor = 0
+        self.n_accum = 0
+
+
+        # --- Do src=None, if you don't want to generate the random batch --- #
+        self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        self.batch_sz = 12000 
+        self.batch = Batch(None, None)
+        self.optimizer = Adam(
+            self.model.parameters(), lr=1, betas=(0.9, 0.98), eps=1e-9
+        )
+        self.scheduler = LambdaLR(
+            optimizer=self.optimizer, lr_lambda=lambda _: self.rate() 
+        )
+        self.criterion = LabelSmoothing(voclen_src, self.padding_idx, -1.1)
+        self.loss_fn = Loss(self.generator, self.criterion) 
+        self.t_dl, self.v_dl = self.batch.get_dataloader(
+            device=torch.device("cuda" if torch.cuda.is_available() else "cpu"),
+            vocab_src=vocab_src,
+            vocab_trg=vocab_trg,
+            vocab2dec=vocab2dec,
+            vocab2enc=vocab2enc,
+            batch_sz=12000,
+            padding=128,
+            is_distributed=False)    
+
+    def rate(self):
+        if self.step <= 0:
+            self.step = 1
+        return self.factor * (
+            512 ** (-0.5) * min(self.step ** (-0.5), self.step * self.warmup ** (-1.5))
+        )
+
+    def run_epoch(
+        self,
+        mode="train",
+        accum_iter=1
+    ):
+        start = time.time()
+        total_tokens = 0
+        total_loss = 0
+        tokens = 0
+        n_accum = 0
+        for i, batch in enumerate(self.t_dl):
+            _batch = Batch(batch[0], batch[1]) 
+            out = self.model.forward(
+                _batch.src, _batch.trg, _batch.src_mask, _batch.trg_mask
+            )
+            loss, loss_node = self.loss_fn(out, _batch.trg_y, _batch.ntokens)
+            # loss_node = loss_node / accum_iter
+            if mode == "train" or mode == "train+log":
+                loss_node.backward()
+                self.step += 1
+                self.samples += _batch.src.shape[0]
+                self.tokens += _batch.ntokens
+                if i % accum_iter == 0:
+                    self.optimizer.step()
+                    self.optimizer.zero_grad(set_to_none=True)
+                    self.n_accum += 1
+                    self.accum_step += 1
+                self.scheduler.step()
+
+            total_loss += loss
+            total_tokens += _batch.ntokens
+            tokens += _batch.ntokens
+            if i % 40 == 1 and (mode == "train" or mode == "train+log"):
+                self.scheduler = self.optimizer.param_groups[0]["lr"]
+                elapsed = time.time() - start
                 print(
-                    f"Predicting: {data["target"]}\nTarget: {data["source"]}\n"
-                    f"Predicted: {pred.shape} {pred}"
+                    (
+                        "Epoch Step: %6d | Accumulation Step: %3d | Loss: %6.2f "
+                        + "| Tokens / Sec: %7.1f | Learning Rate: %6.1e"
+                    )
+                    % (
+                        i,
+                        n_accum,
+                        loss / _batch.ntokens,
+                        tokens / elapsed,
+                        self.scheduler,
+                    )
                 )
-                print(data["target"].shape)
-                loss = loss_fn(pred, data["target"])
-                self.optimizer.zero_grad()
-                loss.backward()
-                self.optimizer.step()
+                start = time.time()
+                tokens = 0
+        return total_loss / total_tokens
