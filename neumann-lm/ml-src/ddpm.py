@@ -53,9 +53,9 @@ class ResidualBlock(nn.Module):
         self.time_embedding = nn.Linear(time_channels, out_channels)
 
     def forward(self, x, t):
-        out = self.conv1(self.swish(self.norm1(x)))
+        out = self.conv1(self.swish(self.gnorm1(x)))
         out += self.time_embedding(self.swish(t))[:, :, None, None]
-        out = self.conv2(self.dropout(self.swish(self.norm2(out))))
+        out = self.conv2(self.dropout(self.swish(self.gnorm2(out))))
         return out + self.shortcut(x)
 
 
@@ -249,15 +249,16 @@ class UNet(nn.Module):
 
 
 class DenoiseModel(nn.Module):
-    def __init__(self, noise_model: nn.Module, steps: int):
+    def __init__(self, noise_model: nn.Module, steps: int, batch_sz=32):
         super().__init__()
         """
         For this model the recommended model for noise is UNet
         """
-        self.device = torch.device("cuda" if self.use_cuda else "cpu")
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.batch_sz = batch_sz
         self.noise_model = noise_model
         self.beta = torch.linspace(0.0001, 0.02, steps).to(self.device)
-        self.steps = steps
+        self.n_steps = steps
         self.alpha = 1 - self.beta
         self.alpha_b = torch.cumprod(self.alpha, dim=0)
         self.sigma2 = self.beta
@@ -289,10 +290,11 @@ class DenoiseModel(nn.Module):
         eps = torch.randn(xt.shape, device=self.device)
         return mean + (var**0.5) * eps
 
-    def loss(self, x0: torch.Tensor, noise: torch.Tensor, batch_sz: int):
-        assert noise is not None, "[ERROR] There is no noise!"
+    def loss(self, x0: torch.Tensor, noise=None):
+        if noise is None:
+            noise = torch.randn_like(x0)
         t = torch.randint(
-            0, self.n_steps, (batch_sz,), device=self.device, dtype=torch.long
+            0, self.n_steps, (self.batch_sz,), device=self.device, dtype=torch.long
         )
         xt = self.q_sample(x0, t, eps=noise)
         eps_theta = self.noise_model(xt, t)
