@@ -21,6 +21,7 @@ class DDPMTraining:
         self.batch_sz=batch_sz
         self.lr = lr
         print(f"[INFO] EPOCH: INITIALIZED")
+        print(f"[INFO] DEVICE: {_device}")
         print(f"[INFO] NOISE MODEL: INITIALIZING...")
         self.eps_model = UNet(image_channels=img_channels).to(_device) 
         print(f"[INFO] NOISE MODEL: INITIALIZED")
@@ -33,6 +34,7 @@ class DDPMTraining:
         print(f"[INFO] DATALOADER: INITIALIZING...")
         self.dl = DataLoader(self.dataset, self.batch_sz, shuffle=True,
                              pin_memory=True)
+        print(f"[INFO] DATALOADER: SIZE: {len(self.dl)}")
         print(f"[INFO] DATALOADER: INITIALIZED")
         print(f"[INFO] OPTIMIZER: INITIALIZING...")
         self.optimizer = Adam(self.eps_model.parameters(), lr=self.lr)
@@ -56,6 +58,7 @@ class DDPMTraining:
                 x = self.dif_model.p_sample(x, x.new_full((self.n_samples,), t, dtype=torch.long))
 
     def run_epoch(self, epoch): 
+        print(f"[INFO] EPOCH: {epoch}")
         for data in self.dl:
             _data = data[0].to(_device)
             self.optimizer.zero_grad()
