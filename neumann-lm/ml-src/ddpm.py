@@ -4,7 +4,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
 
-
+_device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 class Swish(nn.Module):
     def __init__(self):
         super().__init__()
@@ -27,7 +27,7 @@ class PosEmbedding(nn.Module):
     def forward(self, x):
         half_dim = self.n_channels // 8
         emb = np.log(10000) // (half_dim - 1)
-        emb = torch.exp(torch.arange(half_dim, device=x.device) * -emb)
+        emb = torch.exp(torch.arange(half_dim, device=_device) * -emb)
         emb = x[:, None] * emb[None, :]
         emb = torch.cat((emb.sin(), emb.cos()), dim=1)
         emb = self.swish(self.linear1(emb))
@@ -254,10 +254,9 @@ class DenoiseModel(nn.Module):
         """
         For this model the recommended model for noise is UNet
         """
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.batch_sz = batch_sz
         self.noise_model = noise_model
-        self.beta = torch.linspace(0.0001, 0.02, steps).to(self.device)
+        self.beta = torch.linspace(0.0001, 0.02, steps)
         self.n_steps = steps
         self.alpha = 1 - self.beta
         self.alpha_b = torch.cumprod(self.alpha, dim=0)
@@ -287,15 +286,16 @@ class DenoiseModel(nn.Module):
         eps_coefficients = ((1 - alpha) / (1 - alpha_b)) ** 0.5
         mean = (1 / alpha**0.5) * (xt - eps_coefficients * eps_theta)
         var = self.usq_n_gather(self.sigma2, t)
-        eps = torch.randn(xt.shape, device=self.device)
+        eps = torch.randn(xt.shape, device=_device)
         return mean + (var**0.5) * eps
 
     def loss(self, x0: torch.Tensor, noise=None):
+        batch_sz = x0.shape[0]
+        t = torch.randint(
+            0, self.n_steps, (batch_sz,), device=_device, dtype=torch.long
+        )
         if noise is None:
             noise = torch.randn_like(x0)
-        t = torch.randint(
-            0, self.n_steps, (self.batch_sz,), device=self.device, dtype=torch.long
-        )
         xt = self.q_sample(x0, t, eps=noise)
         eps_theta = self.noise_model(xt, t)
         return F.mse_loss(noise, eps_theta)
