@@ -4,6 +4,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import copy
 
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 class Generator(nn.Module):
     def __init__(self, d_model, vocab):
@@ -11,7 +12,7 @@ class Generator(nn.Module):
         self.proj = nn.Linear(d_model, vocab)
 
     def forward(self, x):
-        return torch.log_softmax(self.proj(x), dim=-1)
+        return torch.log_softmax(self.proj(x), dim=-1).to(device) 
 
 
 class LayerNorm(nn.Module):
@@ -39,7 +40,7 @@ class SublayerCon(nn.Module):
         self.dropout = nn.Dropout(dropout)
 
     def forward(self, x, sublayer):
-        return x + self.dropout(sublayer(self.norm(x)))
+        return x.to(device) + self.dropout(sublayer(self.norm(x))).to(device) 
 
 
 class EncoderLayer(nn.Module):
@@ -52,9 +53,9 @@ class EncoderLayer(nn.Module):
             [copy.deepcopy(SublayerCon(sz, dropout)) for _ in range(n)]
         )
 
-    def forward(self, x, mask):
-        x = self.sublayer[0](x, lambda x: self.attn(x, x, x, mask))
-        return self.sublayer[1](x, self.ffn)
+    def forward(self, x):
+        x = self.sublayer[0](x, lambda x: self.attn(x, x, x))
+        return self.sublayer[1](x, self.ffn).to(device) 
 
 
 class NLPEncoder(nn.Module):
@@ -63,15 +64,13 @@ class NLPEncoder(nn.Module):
         """
         Main Encoder class, holds layers.
         """
-        self.use_cuda = torch.cuda.is_available()
-        self.device = torch.device("cuda" if self.use_cuda else "cpu")
         self.layers = nn.ModuleList([copy.deepcopy(layer) for _ in range(N)])
         self.norm = LayerNorm(layer.sz)
 
     def forward(self, x, mask):
         for layer in self.layers:
             x = layer(x, mask)
-        return self.norm(x).to(self.device)
+        return self.norm(x).to(device)
 
 
 class DecoderLayer(nn.Module):
@@ -88,28 +87,26 @@ class DecoderLayer(nn.Module):
     def forward(self, x, mem, src_mask, trg_mask):
         x = self.sublayer[0](x, lambda x: self.attn(x, x, x, trg_mask))
         x = self.sublayer[1](x, lambda x: self.src_attn(x, mem, mem, src_mask))
-        return self.sublayer[2](x, self.ffn)
+        return self.sublayer[2](x, self.ffn).to(device) 
 
 
 class NLPDecoder(nn.Module):
     def __init__(self, layer, N):
         super().__init__()
         self.use_cuda = torch.cuda.is_available()
-        self.device = torch.device("cuda" if self.use_cuda else "cpu")
         self.layers = nn.ModuleList([copy.deepcopy(layer) for _ in range(N)])
         self.norm = LayerNorm(layer.sz)
 
     def forward(self, x, mem, src_mask, trg_mask):
         for layer in self.layers:
             x = layer(x, mem, src_mask, trg_mask)
-        return self.norm(x)
+        return self.norm(x).to(device) 
 
 
 class Transformer(nn.Module):
     def __init__(self, encoder, decoder, src_embed, trg_embed, generator):
         super().__init__()
         self.use_cuda = torch.cuda.is_available()
-        self.device = torch.device("cuda" if self.use_cuda else "cpu")
         self.encoder = encoder
         self.decoder = decoder
         self.src_embed = src_embed
@@ -121,13 +118,14 @@ class Transformer(nn.Module):
     """
 
     def encode(self, src, src_mask):
-        return self.encoder(self.src_embed(src), src_mask)
+        return self.encoder(self.src_embed(src), src_mask).to(device) 
 
     def decode(self, mem, src_mask, trg, trg_mask):
-        self.decoder(self.trg_embed(trg), mem, src_mask, trg_mask)
+        self.decoder(self.trg_embed(trg), mem, src_mask, trg_mask).to(device) 
 
     def forward(self, src, trg, src_mask, trg_mask):
-        return self.decode(self.encode(src, src_mask), src_mask, trg, trg_mask)
+        return self.decode(self.encode(src, src_mask), src_mask, trg,
+                           trg_mask) 
 
 
 def sub_mask(sz):
@@ -141,7 +139,6 @@ class MultiHeadAttention(nn.Module):
         assert d_model == h * 64, f"[ERROR] Model dimension doesn't match your"
         f"parallel attention layers"
         self.use_cuda = torch.cuda.is_available()
-        self.device = torch.device("cuda" if self.use_cuda else "cpu")
         self.dim_k = d_model // h
         self.h = h
         self.linears = nn.ModuleList(
@@ -165,7 +162,7 @@ class MultiHeadAttention(nn.Module):
         sattn = self.dropout(sattn)
         return torch.matmul(sattn, v), sattn
 
-    def forward(self, q, k, v):
+    def forward(self, q, k, v, mask):
         if self.need_mask:
             mask = sub_mask(q.shape[-1])
             mask = mask.unsqueeze(1)
@@ -177,7 +174,7 @@ class MultiHeadAttention(nn.Module):
         x, self.attn = self.get_attn(q, k, v)
 
         x = x.transpose(1, 2).contiguous().view(nbatch, -1, self.h * self.dim_k)
-        return self.linears[-1](x)
+        return self.linears[-1](x).to(device) 
 
 
 class Embeddings(nn.Module):
@@ -206,14 +203,13 @@ class PositionalEncoding(nn.Module):
 
     def forward(self, x):
         x = x + self.pe[:, : x.size(1)].requires_grad_(False)
-        return self.dropout(x)
+        return self.dropout(x).to(device) 
 
 
 class FeedForwardNetwork(nn.Module):
     def __init__(self, dim_model, dim_ffnout, dropout=0.1):
         super().__init__()
         self.use_cuda = torch.cuda.is_available()
-        self.device = torch.device("cuda" if self.use_cuda else "cpu")
         self.w1 = nn.Linear(dim_model, dim_ffnout)
         self.w2 = nn.Linear(dim_ffnout, dim_model)
         self.dropout = nn.Dropout(dropout)
@@ -222,4 +218,4 @@ class FeedForwardNetwork(nn.Module):
         out = self.w1(x)
         out = F.relu(out)
         out = self.dropout(out)
-        return self.w2(out).to(self.device)
+        return self.w2(out).to(device)
