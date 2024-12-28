@@ -7,7 +7,7 @@ import time
 
 _device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 class DDPMTraining:
-    def __init__(self, img_channels=1, img_sz=32, n_samples=16, n_steps=1000,
+    def __init__(self, img_channels=1, img_sz=224, n_samples=16, n_steps=1000,
                  nepoch=100, batch_sz=32, lr=0.001):
         """
         Here comes the training. 
@@ -41,9 +41,9 @@ class DDPMTraining:
         print(f"[INFO] OPTIMIZER: INITIALIZED")
 
 
-    def get_dataset(self, img_sz=448):
+    def get_dataset(self):
         transform = torchvision.transforms.Compose([
-            torchvision.transforms.Resize(img_sz),
+            torchvision.transforms.Resize(self.img_sz),
             torchvision.transforms.ToTensor(),
         ])
         return torchvision.datasets.MNIST(root='./data', train=True,
