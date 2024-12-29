@@ -263,7 +263,7 @@ class DenoiseModel(nn.Module):
         self.sigma2 = self.beta
 
     def usq_n_gather(self, constants, t):
-        return constants.gather(-1, t).view(-1, 1, 1, 1)
+        return constants.gather(-1, t).view(-1, 1, 1, 1).to(_device) 
 
     def q_xt_x0(self, x0: torch.Tensor, t: torch.Tensor):
         c_r = self.usq_n_gather(self.alpha_b, t)
@@ -276,7 +276,7 @@ class DenoiseModel(nn.Module):
     ):
         if eps is None:
             eps = torch.randn_like(x0)
-        mean, var = self.q_xt_x0(x0, t)
+        mean, var = self.q_xt_x0(x0, t) 
         return mean + (var**0.5) * eps
 
     def p_sample(self, xt: torch.Tensor, t: torch.Tensor):
