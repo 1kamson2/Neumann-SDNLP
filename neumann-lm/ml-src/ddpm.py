@@ -263,7 +263,7 @@ class DenoiseModel(nn.Module):
         self.sigma2 = self.beta
 
     def usq_n_gather(self, constants, t):
-        return constants.gather(-1, t).view(-1, 1, 1, 1).to(_device) 
+        return constants.gather(-1, t).to(_device).view(-1, 1, 1, 1) 
 
     def q_xt_x0(self, x0: torch.Tensor, t: torch.Tensor):
         c_r = self.usq_n_gather(self.alpha_b, t)
