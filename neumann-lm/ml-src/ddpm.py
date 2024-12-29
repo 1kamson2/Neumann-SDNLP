@@ -219,7 +219,8 @@ class UNet(nn.Module):
             out_channels = in_channels // ch_mults[i]
             up.append(UpBlock(in_channels, out_channels, n_channels * 4, is_attn[i]))
             in_channels = out_channels
-            up.append(UpSample(in_channels))
+            if i > 0: 
+                up.append(UpSample(in_channels))
 
         self.up = nn.ModuleList(up)
         self.norm = nn.GroupNorm(8, n_channels)
@@ -256,7 +257,7 @@ class DenoiseModel(nn.Module):
         """
         self.batch_sz = batch_sz
         self.noise_model = noise_model
-        self.beta = torch.linspace(0.0001, 0.02, steps)
+        self.beta = torch.linspace(0.0001, 0.02, steps, device=_device)
         self.n_steps = steps
         self.alpha = 1 - self.beta
         self.alpha_b = torch.cumprod(self.alpha, dim=0)
@@ -286,6 +287,7 @@ class DenoiseModel(nn.Module):
         alpha_b = self.usq_n_gather(self.alpha_b, t)
         alpha = self.usq_n_gather(self.alpha, t)
         eps_coefficients = ((1 - alpha) / (1 - alpha_b)) ** 0.5
+        print(xt.shape, eps_theta.shape)
         mean = (1 / alpha**0.5) * (xt - eps_coefficients * eps_theta)
         var = self.usq_n_gather(self.sigma2, t)
         eps = torch.randn(xt.shape, device=_device)
@@ -298,5 +300,5 @@ class DenoiseModel(nn.Module):
         xt = self.q_sample(x0, t, eps=noise)
         eps_theta = self.noise_model(xt, t)
         if noise is None:
-            noise = torch.randn_like(eps_theta)
+            noise = torch.randn_like(xt)
         return F.mse_loss(noise, eps_theta)
