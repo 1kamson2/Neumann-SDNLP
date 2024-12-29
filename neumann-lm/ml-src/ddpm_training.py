@@ -84,4 +84,6 @@ class DDPMTraining:
         print(f"[INFO]: TRAINING: ENDED, TIME ELAPSED:"
               f"{time.time() - _time:0.3f}")
 
+        torch.save(self.eps_model.state_dict(), "./UNET_WEIGHTS.pt")
+        torch.save(self.dif_model.state_dict(), "./DDPM_WEIGHTS.pt")
 
