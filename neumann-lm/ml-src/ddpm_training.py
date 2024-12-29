@@ -59,10 +59,11 @@ class DDPMTraining:
     def sample(self):
         with torch.no_grad():
             x = torch.randn([self.n_samples, self.img_channels, self.img_sz,
-                             self.img_sz])
+                             self.img_sz], device=_device)
             for _t in range(self.n_steps):
                 t = self.n_steps - _t - 1
-                x = self.dif_model.p_sample(x, x.new_full((self.n_samples,), t, dtype=torch.long))
+                x = self.dif_model.p_sample(x, x.new_full((self.n_samples,), t,
+                                                          device=_device, dtype=torch.long))
 
     def run_epoch(self, epoch): 
         print(f"[INFO] EPOCH: {epoch}")
