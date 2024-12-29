@@ -290,12 +290,11 @@ class DenoiseModel(nn.Module):
         return mean + (var**0.5) * eps
 
     def loss(self, x0: torch.Tensor, noise=None):
-        batch_sz = x0.shape[0]
         t = torch.randint(
-            0, self.n_steps, (batch_sz,), device=_device, dtype=torch.long
+            0, self.n_steps, (self.batch_sz,), device=_device, dtype=torch.long
         )
-        if noise is None:
-            noise = torch.randn_like(x0)
         xt = self.q_sample(x0, t, eps=noise)
         eps_theta = self.noise_model(xt, t)
+        if noise is None:
+            noise = torch.randn_like(eps_theta)
         return F.mse_loss(noise, eps_theta)
