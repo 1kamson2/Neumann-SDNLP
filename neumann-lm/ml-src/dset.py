@@ -3,7 +3,7 @@ import logging
 from torch.utils.data import Dataset
 from enum import Enum
 from functools import lru_cache
-from nlp import sub_mask
+from nlp_model.nlp import sub_mask
 import torch.nn as nn
 from torch.nn.functional import log_softmax, pad
 import torchtext.datasets as datasets

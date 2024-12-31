@@ -287,7 +287,6 @@ class DenoiseModel(nn.Module):
         alpha_b = self.usq_n_gather(self.alpha_b, t)
         alpha = self.usq_n_gather(self.alpha, t)
         eps_coefficients = ((1 - alpha) / (1 - alpha_b)) ** 0.5
-        print(xt.shape, eps_theta.shape)
         mean = (1 / alpha**0.5) * (xt - eps_coefficients * eps_theta)
         var = self.usq_n_gather(self.sigma2, t)
         eps = torch.randn(xt.shape, device=_device)

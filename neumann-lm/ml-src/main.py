@@ -1,6 +1,6 @@
 from dset import *
-from nlp_training import NLP
-from ddpm_training import DDPMTraining
+from nlp_model.nlp_training import NLP
+from ddpm_model.ddpm_training import DDPMApp
 
 
 def main():
@@ -10,8 +10,9 @@ def main():
     """
     # nlp = NLP()
     # nlp.run_epoch()
-    dif = DDPMTraining() 
-    dif.training()
+
+    dif = DDPMApp() 
+    dif.evaluate()
     
 if __name__ == "__main__":
     main()

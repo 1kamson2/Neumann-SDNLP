@@ -1,4 +1,4 @@
-from nlp import *
+from nlp_model.nlp import *
 from dset import *
 from torch.utils.data import DataLoader
 import torch

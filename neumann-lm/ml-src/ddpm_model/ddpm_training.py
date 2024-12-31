@@ -1,19 +1,19 @@
-from ddpm import DenoiseModel, UNet
+from ddpm_model.ddpm import DenoiseModel, UNet
 import torchvision
+from torchvision.utils import save_image
 import torch
 from torch.utils.data import DataLoader 
 from torch.optim import Adam
 import time
 
 _device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-class DDPMTraining:
+class DDPMApp:
     def __init__(self, img_channels=3, img_sz=32, n_channels=64,
                  channels_mul=(1,2,2,4), is_attn = (False, False, False, True),
                  n_samples=16, n_steps=1000, nepoch=100, batch_sz=32, lr=0.001):
         """
         Here comes the training. 
         """
-        print(f"[INFO]: EPOCH INFORMATION: INITIALIZING...")
         self.img_channels = img_channels
         self.img_sz = img_sz
         self.n_channels = n_channels
@@ -24,27 +24,14 @@ class DDPMTraining:
         self.nepoch = nepoch
         self.batch_sz=batch_sz
         self.lr = lr
-        print(f"[INFO] EPOCH: INITIALIZED")
-        print(f"[INFO] DEVICE: {_device}")
-        print(f"[INFO] NOISE MODEL: INITIALIZING...")
         self.eps_model = UNet(image_channels=img_channels,
                               n_channels=self.n_channels,
                               ch_mults=self.channels_mul, is_attn=self.is_attn).to(_device) 
-        print(f"[INFO] NOISE MODEL: INITIALIZED")
-        print(f"[INFO] DIFFUSION MODEL: INITIALIZING...")
         self.dif_model = DenoiseModel(noise_model=self.eps_model, steps=self.n_steps, batch_sz=32).to(_device) 
-        print(f"[INFO] DIFFUSION MODEL: INITIALIZED")
-        print(f"[INFO] DATASET: INITIALIZING...")
         self.dataset = self.get_dataset()
-        print(f"[INFO] DATASET: INITIALIZED")
-        print(f"[INFO] DATALOADER: INITIALIZING...")
         self.dl = DataLoader(self.dataset, self.batch_sz, shuffle=True,
                              pin_memory=True)
-        print(f"[INFO] DATALOADER: SIZE: {len(self.dl)}")
-        print(f"[INFO] DATALOADER: INITIALIZED")
-        print(f"[INFO] OPTIMIZER: INITIALIZING...")
         self.optimizer = Adam(self.eps_model.parameters(), lr=self.lr)
-        print(f"[INFO] OPTIMIZER: INITIALIZED")
 
 
     def get_dataset(self):
@@ -77,14 +64,30 @@ class DDPMTraining:
                 print(f"Current loss is: {loss}")
 
     def training(self):
-        _time = time.time()
         print("[INFO] TRAINING: BEGINS")
+        _time = time.time()
         for epoch in range(self.nepoch):
             self.run_epoch(epoch)
             self.sample()
         print(f"[INFO]: TRAINING: ENDED, TIME ELAPSED:"
               f"{time.time() - _time:0.3f}")
 
-        torch.save(self.eps_model.state_dict(), "./UNET_WEIGHTS.pt")
-        torch.save(self.dif_model.state_dict(), "./DDPM_WEIGHTS.pt")
+        torch.save(self.eps_model.state_dict(), "../weights/UNET_WEIGHTS.pt")
+        torch.save(self.dif_model.state_dict(), "../weights/DDPM_WEIGHTS.pt")
 
+    def evaluate(self):
+        xt = torch.randn([self.n_samples, self.img_channels, self.img_sz,
+                          self.img_sz], device=_device)
+        # --- RELOAD MODEL WITH NEW WEIGHTS --- #
+        # self.eps_model.load_state_dict(torch.load('../weights/UNET_WEIGHTS.pth', weights_only=True))
+        # self.dif_model.eps_model = self.eps_model
+        # self.dif_model.load_state_dict(torch.load('../weights/DDPM_WEIGHTS.pth', weights_only=True))
+        self.dif_model.eval()
+        with torch.no_grad():
+            for _t in range(self.n_steps):
+                t = self.n_steps - _t - 1
+                xt = self.dif_model.p_sample(xt, xt.new_full((self.n_samples,), t,
+                                                              device=_device, dtype=torch.long))
+
+        for i in range(self.n_samples):
+           save_image(xt[i], f"../ml-src/images/img{i}.png") 
