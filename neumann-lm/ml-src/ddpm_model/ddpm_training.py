@@ -53,21 +53,19 @@ class DDPMApp:
                 x = self.dif_model.p_sample(x, x.new_full((self.n_samples,), t,
                                                           device=_device, dtype=torch.long))
 
+    #@epoch_wrapper(["[INFO] EPOCH: {epoch}"], [])
     def run_epoch(self, epoch): 
         loss = 0
-        print(f"[INFO] EPOCH: {epoch}")
         for data in self.dl:
             _data = data[0].to(_device)
             self.optimizer.zero_grad()
             loss = self.dif_model.loss(_data) 
             loss.backward()
             self.optimizer.step()
-        try:
-            print(f"Current loss is: {loss}")
-        except IOError as e:
-            print(e)
+        print(f"Current loss is: {loss}")
 
 
+    
     def training(self):
         print("[INFO] TRAINING: BEGINS")
         _time = time.time()

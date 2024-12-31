@@ -71,7 +71,7 @@ class NLP:
             vocab_trg=vocab_trg,
             vocab2dec=vocab2dec,
             vocab2enc=vocab2enc,
-            batch_sz=12000,
+            batch_sz=1024,
             padding=128,
             is_distributed=False)    
 

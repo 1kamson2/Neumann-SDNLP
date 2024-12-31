@@ -4,7 +4,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import copy
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+_device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 class Generator(nn.Module):
     def __init__(self, d_model, vocab):
@@ -12,7 +12,7 @@ class Generator(nn.Module):
         self.proj = nn.Linear(d_model, vocab)
 
     def forward(self, x):
-        return torch.log_softmax(self.proj(x), dim=-1).to(device) 
+        return torch.log_softmax(self.proj(x), dim=-1).to(_device) 
 
 
 class LayerNorm(nn.Module):
@@ -40,7 +40,7 @@ class SublayerCon(nn.Module):
         self.dropout = nn.Dropout(dropout)
 
     def forward(self, x, sublayer):
-        return x.to(device) + self.dropout(sublayer(self.norm(x))).to(device) 
+        return x.to(_device) + self.dropout(sublayer(self.norm(x))).to(_device) 
 
 
 class EncoderLayer(nn.Module):
@@ -55,7 +55,7 @@ class EncoderLayer(nn.Module):
 
     def forward(self, x):
         x = self.sublayer[0](x, lambda x: self.attn(x, x, x))
-        return self.sublayer[1](x, self.ffn).to(device) 
+        return self.sublayer[1](x, self.ffn).to(_device) 
 
 
 class NLPEncoder(nn.Module):
@@ -70,7 +70,7 @@ class NLPEncoder(nn.Module):
     def forward(self, x, mask):
         for layer in self.layers:
             x = layer(x, mask)
-        return self.norm(x).to(device)
+        return self.norm(x).to(_device)
 
 
 class DecoderLayer(nn.Module):
@@ -87,7 +87,7 @@ class DecoderLayer(nn.Module):
     def forward(self, x, mem, src_mask, trg_mask):
         x = self.sublayer[0](x, lambda x: self.attn(x, x, x, trg_mask))
         x = self.sublayer[1](x, lambda x: self.src_attn(x, mem, mem, src_mask))
-        return self.sublayer[2](x, self.ffn).to(device) 
+        return self.sublayer[2](x, self.ffn).to(_device) 
 
 
 class NLPDecoder(nn.Module):
@@ -100,7 +100,7 @@ class NLPDecoder(nn.Module):
     def forward(self, x, mem, src_mask, trg_mask):
         for layer in self.layers:
             x = layer(x, mem, src_mask, trg_mask)
-        return self.norm(x).to(device) 
+        return self.norm(x).to(_device) 
 
 
 class Transformer(nn.Module):
@@ -118,10 +118,10 @@ class Transformer(nn.Module):
     """
 
     def encode(self, src, src_mask):
-        return self.encoder(self.src_embed(src), src_mask).to(device) 
+        return self.encoder(self.src_embed(src), src_mask).to(_device) 
 
     def decode(self, mem, src_mask, trg, trg_mask):
-        self.decoder(self.trg_embed(trg), mem, src_mask, trg_mask).to(device) 
+        self.decoder(self.trg_embed(trg), mem, src_mask, trg_mask).to(_device) 
 
     def forward(self, src, trg, src_mask, trg_mask):
         return self.decode(self.encode(src, src_mask), src_mask, trg,
@@ -174,7 +174,7 @@ class MultiHeadAttention(nn.Module):
         x, self.attn = self.get_attn(q, k, v)
 
         x = x.transpose(1, 2).contiguous().view(nbatch, -1, self.h * self.dim_k)
-        return self.linears[-1](x).to(device) 
+        return self.linears[-1](x).to(_device) 
 
 
 class Embeddings(nn.Module):
@@ -203,7 +203,7 @@ class PositionalEncoding(nn.Module):
 
     def forward(self, x):
         x = x + self.pe[:, : x.size(1)].requires_grad_(False)
-        return self.dropout(x).to(device) 
+        return self.dropout(x).to(_device) 
 
 
 class FeedForwardNetwork(nn.Module):
@@ -218,4 +218,4 @@ class FeedForwardNetwork(nn.Module):
         out = self.w1(x)
         out = F.relu(out)
         out = self.dropout(out)
-        return self.w2(out).to(device)
+        return self.w2(out).to(_device)
