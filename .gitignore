@@ -2,6 +2,8 @@
 .mypy_cache/
 neumann-lm/ml-src/.*/
 neumann-lm/ml-src/data/* 
+neumann-lm/ml-src/data/* 
+neumann-lm/ml-src/images/* 
 __pycache__/
 *.py[cod]
 *$py.class
