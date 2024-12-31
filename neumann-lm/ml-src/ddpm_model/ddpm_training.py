@@ -10,7 +10,7 @@ _device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 class DDPMApp:
     def __init__(self, img_channels=3, img_sz=32, n_channels=64,
                  channels_mul=(1,2,2,4), is_attn = (False, False, False, True),
-                 n_samples=16, n_steps=1000, nepoch=100, batch_sz=32, lr=0.001):
+                 n_samples=16, n_steps=1000, nepoch=3, batch_sz=64, lr=2e-5):
         """
         Here comes the training. 
         """
@@ -27,7 +27,8 @@ class DDPMApp:
         self.eps_model = UNet(image_channels=img_channels,
                               n_channels=self.n_channels,
                               ch_mults=self.channels_mul, is_attn=self.is_attn).to(_device) 
-        self.dif_model = DenoiseModel(noise_model=self.eps_model, steps=self.n_steps, batch_sz=32).to(_device) 
+        self.dif_model = DenoiseModel(noise_model=self.eps_model,
+                                      steps=self.n_steps, batch_sz=self.batch_sz).to(_device) 
         self.dataset = self.get_dataset()
         self.dl = DataLoader(self.dataset, self.batch_sz, shuffle=True,
                              pin_memory=True)
@@ -53,6 +54,7 @@ class DDPMApp:
                                                           device=_device, dtype=torch.long))
 
     def run_epoch(self, epoch): 
+        loss = 0
         print(f"[INFO] EPOCH: {epoch}")
         for data in self.dl:
             _data = data[0].to(_device)
@@ -60,8 +62,11 @@ class DDPMApp:
             loss = self.dif_model.loss(_data) 
             loss.backward()
             self.optimizer.step()
-            if epoch >= 10 and epoch % 20 == 0:
-                print(f"Current loss is: {loss}")
+        try:
+            print(f"Current loss is: {loss}")
+        except IOError as e:
+            print(e)
+
 
     def training(self):
         print("[INFO] TRAINING: BEGINS")
@@ -72,16 +77,17 @@ class DDPMApp:
         print(f"[INFO]: TRAINING: ENDED, TIME ELAPSED:"
               f"{time.time() - _time:0.3f}")
 
-        torch.save(self.eps_model.state_dict(), "./weights/UNET_WEIGHTS.pt")
-        torch.save(self.dif_model.state_dict(), "./weights/DDPM_WEIGHTS.pt")
+        torch.save(self.eps_model.state_dict(), "./weights/UNET_WEIGHTS.pth")
+        torch.save(self.dif_model.state_dict(), "./weights/DDPM_WEIGHTS.pth")
 
     def evaluate(self):
         xt = torch.randn([self.n_samples, self.img_channels, self.img_sz,
                           self.img_sz], device=_device)
         # --- RELOAD MODEL WITH NEW WEIGHTS --- #
-        # self.eps_model.load_state_dict(torch.load('../weights/UNET_WEIGHTS.pth', weights_only=True))
-        # self.dif_model.eps_model = self.eps_model
-        # self.dif_model.load_state_dict(torch.load('../weights/DDPM_WEIGHTS.pth', weights_only=True))
+        self.eps_model.load_state_dict(torch.load('./weights/UNET_WEIGHTS.pth',
+        weights_only=True, map_location=_device))
+        self.dif_model.load_state_dict(torch.load('./weights/DDPM_WEIGHTS.pth',
+        weights_only=True, map_location=_device))
         self.dif_model.eval()
         with torch.no_grad():
             for _t in range(self.n_steps):

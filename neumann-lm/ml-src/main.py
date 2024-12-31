@@ -7,12 +7,14 @@ def main():
     """
     todo: add logging
     todo: make it read tokens
+    todo: make wrappers for better output 
     """
     # nlp = NLP()
     # nlp.run_epoch()
 
     dif = DDPMApp() 
-    dif.evaluate()
+    dif.training()
+    #dif.evaluate()
     
 if __name__ == "__main__":
     main()
