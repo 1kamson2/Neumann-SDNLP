@@ -72,8 +72,8 @@ class DDPMApp:
         print(f"[INFO]: TRAINING: ENDED, TIME ELAPSED:"
               f"{time.time() - _time:0.3f}")
 
-        torch.save(self.eps_model.state_dict(), "../weights/UNET_WEIGHTS.pt")
-        torch.save(self.dif_model.state_dict(), "../weights/DDPM_WEIGHTS.pt")
+        torch.save(self.eps_model.state_dict(), "./weights/UNET_WEIGHTS.pt")
+        torch.save(self.dif_model.state_dict(), "./weights/DDPM_WEIGHTS.pt")
 
     def evaluate(self):
         xt = torch.randn([self.n_samples, self.img_channels, self.img_sz,
@@ -90,4 +90,4 @@ class DDPMApp:
                                                               device=_device, dtype=torch.long))
 
         for i in range(self.n_samples):
-           save_image(xt[i], f"../ml-src/images/img{i}.png") 
+           save_image(xt[i], f"./images/img{i}.png") 
