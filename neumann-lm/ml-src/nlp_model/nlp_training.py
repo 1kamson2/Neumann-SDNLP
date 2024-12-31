@@ -8,6 +8,7 @@ from torch.optim.lr_scheduler import LambdaLR
 import time
 
 
+_device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 class NLP:
     def __init__(
         self, N=6, d_model=512, d_ffn=2048, h=8, dropout=0.1
@@ -40,7 +41,7 @@ class NLP:
             nn.Sequential(Embeddings(d_model, voclen_src), c(self.pos)),
             nn.Sequential(Embeddings(d_model, voclen_trg), c(self.pos)),
             self.generator
-        )
+        ).to(_device) 
         # --- Initialize variables for epoch tracking --- #
         self.nepoch = 32
         self.warmup = 400
@@ -54,7 +55,6 @@ class NLP:
 
 
         # --- Do src=None, if you don't want to generate the random batch --- #
-        self.device = "cuda" if torch.cuda.is_available() else "cpu"
         self.batch_sz = 12000 
         self.batch = Batch(None, None)
         self.optimizer = Adam(
@@ -63,10 +63,11 @@ class NLP:
         self.scheduler = LambdaLR(
             optimizer=self.optimizer, lr_lambda=lambda _: self.rate() 
         )
-        self.criterion = LabelSmoothing(voclen_src, self.padding_idx, -1.1)
-        self.loss_fn = Loss(self.generator, self.criterion) 
+        self.criterion = LabelSmoothing(voclen_src, self.padding_idx,
+                                        -1.1).to(_device) 
+        self.loss_fn = Loss(self.generator, self.criterion)  
         self.t_dl, self.v_dl = self.batch.get_dataloader(
-            device=torch.device("cuda" if torch.cuda.is_available() else "cpu"),
+            device=_device,
             vocab_src=vocab_src,
             vocab_trg=vocab_trg,
             vocab2dec=vocab2dec,
