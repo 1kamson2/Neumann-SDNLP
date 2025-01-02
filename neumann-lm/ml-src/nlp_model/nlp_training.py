@@ -27,9 +27,9 @@ class NLP:
 
         # --- Initialize Layers for Transformer --- #
         c = copy.deepcopy
-        self.attn = MultiHeadAttention(h, d_model)
-        self.ffn = FeedForwardNetwork(d_model, d_ffn, dropout)
-        self.pos = PositionalEncoding(d_model, dropout)
+        self.attn = MultiHeadAttention(h, d_model).to(_device) 
+        self.ffn = FeedForwardNetwork(d_model, d_ffn, dropout).to(_device)
+        self.pos = PositionalEncoding(d_model, dropout).to(_device)
         self.generator = Generator(d_model, voclen_trg)
         self.padding_idx = vocab_trg["<blank>"]
         self.model = Transformer(
