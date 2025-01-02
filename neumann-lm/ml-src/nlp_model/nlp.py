@@ -120,7 +120,7 @@ class Transformer(nn.Module):
         return self.encoder(self.src_embed(src), src_mask) 
 
     def decode(self, mem, src_mask, trg, trg_mask):
-        self.decoder(self.trg_embed(trg), mem, src_mask, trg_mask) 
+        return self.decoder(self.trg_embed(trg), mem, src_mask, trg_mask) 
 
     def forward(self, src, trg, src_mask, trg_mask):
         return self.decode(self.encode(src, src_mask), src_mask, trg,
