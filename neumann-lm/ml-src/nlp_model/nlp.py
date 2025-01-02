@@ -54,7 +54,7 @@ class EncoderLayer(nn.Module):
 
     def forward(self, x, mask):
         x = self.sublayer[0](x, lambda x: self.attn(x, x, x, mask))
-        return self.sublayer[0](x, self.ffn) 
+        return self.sublayer[1](x, self.ffn) 
 
 
 class NLPEncoder(nn.Module):
@@ -172,7 +172,7 @@ class MultiHeadAttention(nn.Module):
         x, self.attn = get_attn(q, k, v, mask=mask, dropout=self.dropout)
 
         x = x.transpose(1, 2).contiguous().view(nbatch, -1, self.h * self.dim_k)
-        # [TODO]: Should del q, k, v?
+        del q,k,v
         return self.linears[-1](x) 
 
 
