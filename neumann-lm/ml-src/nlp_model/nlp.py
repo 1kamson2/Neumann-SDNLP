@@ -32,7 +32,6 @@ class LayerNorm(nn.Module):
         std = x.std(-1, keepdim=True)
         return self.b + self.a * (x - mean) / (std + self.eps)
 
-
 class SublayerCon(nn.Module):
     def __init__(self, sz, dropout=0.1):
         super().__init__()
@@ -53,9 +52,9 @@ class EncoderLayer(nn.Module):
             [copy.deepcopy(SublayerCon(sz, dropout)) for _ in range(n)]
         )
 
-    def forward(self, x):
-        x = self.sublayer[0](x, lambda x: self.attn(x, x, x))
-        return self.sublayer[1](x, self.ffn).to(_device) 
+    def forward(self, x, mask):
+        x = self.sublayer[0](x, lambda x: self.attn(x, x, x, mask))
+        return self.sublayer[0](x, self.ffn).to(_device) 
 
 
 class NLPEncoder(nn.Module):
@@ -85,6 +84,7 @@ class DecoderLayer(nn.Module):
         )
 
     def forward(self, x, mem, src_mask, trg_mask):
+        # [TODO]: Should do m = memory?
         x = self.sublayer[0](x, lambda x: self.attn(x, x, x, trg_mask))
         x = self.sublayer[1](x, lambda x: self.src_attn(x, mem, mem, src_mask))
         return self.sublayer[2](x, self.ffn).to(_device) 
@@ -106,7 +106,6 @@ class NLPDecoder(nn.Module):
 class Transformer(nn.Module):
     def __init__(self, encoder, decoder, src_embed, trg_embed, generator):
         super().__init__()
-        self.use_cuda = torch.cuda.is_available()
         self.encoder = encoder
         self.decoder = decoder
         self.src_embed = src_embed
@@ -130,50 +129,50 @@ class Transformer(nn.Module):
 
 def sub_mask(sz):
     attn_shape = (1, sz, sz)
-    return torch.triu(torch.ones(attn_shape), diagonal=1).type(torch.uint8)
+    mask = torch.triu(torch.ones(attn_shape), diagonal=1).type(torch.uint8)
+    return (mask == 0).to(torch.bool) 
 
+def get_attn(q, k, v, mask=None, dropout=None):
+    """
+    Compute Scaled Dot Product Attention for set of queries, keys and
+    values. It accepts also mask, mainly for decoder.
+    """
+    dim_k = q.shape[-1]
+    k_t = k.transpose(-2, -1)
+    qk_t = torch.matmul(q, k_t)
+    attn = qk_t / math.sqrt(dim_k)
+    if mask is None:
+        attn = attn.masked_fill(sub_mask(attn.shape[-1]) == 0, -1e9)
+    sattn = attn.softmax(dim=-1)
+    if dropout is not None:
+        sattn = dropout(sattn)
+    return torch.matmul(sattn, v), sattn
 
 class MultiHeadAttention(nn.Module):
-    def __init__(self, h, d_model, dropout=0.1, need_mask=False):
+    def __init__(self, h, d_model, dropout=0.1):
         super().__init__()
         assert d_model == h * 64, f"[ERROR] Model dimension doesn't match your"
         f"parallel attention layers"
-        self.use_cuda = torch.cuda.is_available()
         self.dim_k = d_model // h
         self.h = h
         self.linears = nn.ModuleList(
             [copy.deepcopy(nn.Linear(d_model, d_model)) for _ in range(4)]
         )
+        self.attn = None
         self.dropout = nn.Dropout(dropout)
-        self.need_mask = need_mask
-
-    def get_attn(self, q, k, v):
-        """
-        Compute Scaled Dot Product Attention for set of queries, keys and
-        values. It accepts also mask, mainly for decoder.
-        """
-        dim_k = q.shape[-1]
-        k_t = k.transpose(-2, -1)
-        qk_t = torch.matmul(q, k_t)
-        attn = qk_t / math.sqrt(dim_k)
-        if self.need_mask:
-            attn = attn.masked_fill(sub_mask(attn.shape[-1]) == 0, -1e9)
-        sattn = attn.softmax(dim=-1)
-        sattn = self.dropout(sattn)
-        return torch.matmul(sattn, v), sattn
 
     def forward(self, q, k, v, mask):
-        if self.need_mask:
-            mask = sub_mask(q.shape[-1])
+        if mask is not None:
             mask = mask.unsqueeze(1)
         nbatch = q.shape[0]
         q, k, v = [
             lin(x).view(nbatch, -1, self.h, self.dim_k).transpose(1, 2)
             for lin, x in zip(self.linears, (q, k, v))
         ]
-        x, self.attn = self.get_attn(q, k, v)
+        x, self.attn = get_attn(q, k, v, mask=mask, dropout=self.dropout)
 
         x = x.transpose(1, 2).contiguous().view(nbatch, -1, self.h * self.dim_k)
+        # [TODO]: Should del q, k, v?
         return self.linears[-1](x).to(_device) 
 
 
@@ -209,7 +208,6 @@ class PositionalEncoding(nn.Module):
 class FeedForwardNetwork(nn.Module):
     def __init__(self, dim_model, dim_ffnout, dropout=0.1):
         super().__init__()
-        self.use_cuda = torch.cuda.is_available()
         self.w1 = nn.Linear(dim_model, dim_ffnout)
         self.w2 = nn.Linear(dim_ffnout, dim_model)
         self.dropout = nn.Dropout(dropout)

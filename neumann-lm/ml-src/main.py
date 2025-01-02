@@ -9,12 +9,12 @@ def main():
     todo: make it read tokens
     todo: make wrappers for better output 
     """
-    # nlp = NLP()
-    # nlp.run_epoch()
+    nlp = NLP()
+    nlp.run_epoch()
 
-    dif = DDPMApp() 
-    dif.training()
-    #dif.evaluate()
+    # dif = DDPMApp() 
+    # dif.training()
+    # dif.evaluate()
     
 if __name__ == "__main__":
     main()

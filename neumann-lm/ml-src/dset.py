@@ -71,14 +71,16 @@ class Loss:
         return loss.data * norm, loss
 
 class Batch:
-    def __init__(self, src, trg, pad=2):  # Default padding is <blank>
-        if src is not None and trg is not None:
+    def __init__(self, src, trg, pad=2, finit=False):  # Default padding is <blank>
+        if finit is False:
             self.src = src
-            self.src_mask = (src != pad).unsqueeze(-2)
-            self.trg = trg[:, :-1]
-            self.trg_y = trg[:, 1:]
-            self.trg_mask = self.make_std_mask(self.trg, pad)
-            self.ntokens = (self.trg_y != pad).data.sum()
+            if src is not None:
+                self.src_mask = (src != pad).unsqueeze(-2)
+            if trg is not None:
+                self.trg = trg[:, :-1]
+                self.trg_y = trg[:, 1:]
+                self.trg_mask = self.make_std_mask(self.trg, pad)
+                self.ntokens = (self.trg_y != pad).data.sum()
 
     @staticmethod
     def make_std_mask(trg, pad):

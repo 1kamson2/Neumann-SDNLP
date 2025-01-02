@@ -56,7 +56,7 @@ class NLP:
 
         # --- Do src=None, if you don't want to generate the random batch --- #
         self.batch_sz = 12000 
-        self.batch = Batch(None, None)
+        self.batch = Batch(None, None,finit=True)
         self.optimizer = Adam(
             self.model.parameters(), lr=1, betas=(0.9, 0.98), eps=1e-9
         )
