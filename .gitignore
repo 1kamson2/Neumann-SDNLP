@@ -1,9 +1,9 @@
 .git/
 .mypy_cache/
-neumann-lm/ml-src/.*/
+.*
+*.pt 
 neumann-lm/ml-src/data/* 
-neumann-lm/ml-src/data/* 
-neumann-lm/ml-src/images/* 
+*.png 
 __pycache__/
 *.py[cod]
 *$py.class
