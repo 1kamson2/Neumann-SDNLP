@@ -4,7 +4,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 import copy
 
-_device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 class Generator(nn.Module):
     def __init__(self, d_model, vocab):
@@ -142,7 +141,7 @@ def get_attn(q, k, v, mask=None, dropout=None):
     qk_t = torch.matmul(q, k_t)
     attn = qk_t / math.sqrt(dim_k)
     if mask is None:
-        attn = attn.masked_fill(sub_mask(attn.shape[-1]) == 0, -1e9)
+        attn = attn.masked_fill(sub_mask(attn.shape[-1]), -1e9)
     sattn = attn.softmax(dim=-1)
     if dropout is not None:
         sattn = dropout(sattn)
@@ -201,7 +200,7 @@ class PositionalEncoding(nn.Module):
         self.register_buffer("pe", pe)
 
     def forward(self, x):
-        x = x + self.pe[:, : x.size(1)].requires_grad_(False)
+        x = x + self.pe[:, : x.size(1)]
         return self.dropout(x) 
 
 

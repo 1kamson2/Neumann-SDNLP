@@ -1,3 +1,4 @@
+mod prompt_utils;
 mod server;
 use server::app::Server;
 use std::thread;
