@@ -4,15 +4,15 @@
   "version": "0.1.0",
   "identifier": "com.neumann-lm.app",
   "build": {
-    "frontendDist": "../site-src"
+    "frontendDist": "../frontend"
   },
   "app": {
     "withGlobalTauri": true,
     "windows": [
       {
         "title": "neumann-lm",
-        "width": 800,
-        "height": 600
+        "width": 840,
+        "height": 600 
       }
     ],
     "security": {

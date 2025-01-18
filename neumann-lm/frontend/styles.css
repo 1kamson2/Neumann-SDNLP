@@ -6,11 +6,12 @@
   --accent-color1: #4a4b50;
   --accent-color2: #9ca0a8;
   --global-font: "Charis SIL";
-  --main-height: 850px;
-  --chat-width: 750px;
-  --history-height: 550px;
-  --prompt-width: 750px;
+  --main-height: 85%;
+  --chat-width: 40%;
+  --history-height: 55%;
+  --prompt-width: 40%;
   --prompt-height: 50px;
+  flex-wrap: wrap;
 }
 
 hr {
@@ -46,13 +47,14 @@ nav h1 {
 
 body {
   background-color: var(--bg-color);
-  height: 100%;
+  min-width: 1600px;
+  min-height: 300px;
   overflow: hidden;
   scroll-behavior: smooth;
+  transform-origin: top left;
 }
 
 footer {
-  position: fixed;
   bottom: 0;
   background-color: var(--secondary-bg-color);
   color: var(--accent-color2);
@@ -95,7 +97,7 @@ div.container {
   height: 3em;
   align-content: left;
   position: fixed;
-  bottom: 105px;
+  bottom: 10%;
   width: var(--prompt-width);
   height: var(--prompt-height);
   background-color: var(--secondary-bg-color);
@@ -121,11 +123,11 @@ div.container {
   display: flex;
   flex-direction: column;
   position: fixed;
-  bottom: 200px;
+  bottom: 20%;
   width: var(--prompt-width);
   align-content: left;
   border-radius: 7px;
-  max-height: 500px;
+  max-height: 60%;
   overflow: scroll;
   gap: 10px;
 }
@@ -140,22 +142,21 @@ div.container {
   display: flex;
   flex-direction: column-reverse;
   height: var(--history-height);
-  width: 300px;
+  width: 100%;
   justify-content: start;
   align-items: center;
-  overflow-y: scroll;
 }
 
 /* Class for logging user's history */
 div.history-log {
   font-size: 17px;
-  width: 250px;
+  width: 100%;
   background-color: var(--secondary-bg-color);
   outline: solid var(--accent-color1);
   color: var(--accent-color2);
   text-align: left;
   border-radius: 5px;
-  margin: 10px;
+  margin: 20px;
   padding: 10px 15px 15px;
   white-space: normal;
   overflow-wrap: break-word;

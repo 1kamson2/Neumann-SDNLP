@@ -2,7 +2,6 @@ mod prompt_utils;
 mod server;
 use server::app::Server;
 use std::thread;
-use tokio::runtime::Runtime;
 const IP: &str = "127.0.0.1";
 const PORT: &str = "8000";
 
