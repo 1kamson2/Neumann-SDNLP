@@ -6,11 +6,11 @@ const Tokens = {
 class ChatManager {
   static name = "ChatManager";
   constructor() {
-    this.nmess = 0;
+    this.n_mess = 0;
   }
   async POSTRequest(prompt) {
     try {
-      const response = await fetch("//127.0.0.1:8000", {
+      const response = await fetch("//127.0.0.1:8001", {
         method: "POST",
         headers: {
           "Content-Type": "text/plain",
@@ -32,8 +32,8 @@ class ChatManager {
   async processMessage(content) {
     console.log(`${ChatManager.name} USER: Prompt: ${content}.`);
     try {
-      const dataRecv = await this.POSTRequest(content);
-      console.log(`${ChatManager.name} LLM: Prompt: ${dataRecv}.`);
+      //const dataRecv = await this.POSTRequest(content);
+      //console.log(`${ChatManager.name} LLM: Prompt: ${dataRecv}.`);
       this.createMessage(content);
       this.createMessage(dataRecv);
     } catch (err) {
@@ -45,19 +45,10 @@ class ChatManager {
     const mdiv = document.createElement("div");
     const nodeContent = document.createTextNode(content);
     const lmdiv = document.getElementById("model-n-user-messages");
-    mdiv.classList.add("container");
+    mdiv.classList.add("message");
     mdiv.appendChild(nodeContent);
     lmdiv.appendChild(mdiv);
     userInput.innerText = "";
-  }
-
-  historyEntry(content) {
-    const hdiv = document.createElement("div");
-    const nodeContent = document.createTextNode(content);
-    const lhdiv = document.getElementById("chat-history");
-    hdiv.classList.add("history-log");
-    hdiv.appendChild(nodeContent);
-    lhdiv.appendChild(hdiv);
   }
 }
 
@@ -99,8 +90,7 @@ class EventHandler {
         } else {
           this.chatName = text;
         }
-        this.chat.historyEntry(this.chatName);
-        this.chat.nmess++;
+        this.chat.n_mess++;
         console.log(
           `${EventHandler.name}: A new conversation '${this.chatName}'`,
         );
