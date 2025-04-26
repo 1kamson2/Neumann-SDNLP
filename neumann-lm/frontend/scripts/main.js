@@ -44,7 +44,7 @@ class ChatManager {
   createMessage(content) {
     const mdiv = document.createElement("div");
     const nodeContent = document.createTextNode(content);
-    const lmdiv = document.getElementById("message-container");
+    const lmdiv = document.getElementById("model-n-user-messages");
     mdiv.classList.add("container");
     mdiv.appendChild(nodeContent);
     lmdiv.appendChild(mdiv);
