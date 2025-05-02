@@ -1,0 +1,12 @@
+/home/kums0nd/Dev/neumann/neumann-lm/rust/target/debug/deps/libico-5234ca68ab3fc9d8.rmeta: /home/kums0nd/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ico-0.3.0/src/lib.rs /home/kums0nd/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ico-0.3.0/src/macros.rs /home/kums0nd/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ico-0.3.0/src/bmpdepth.rs /home/kums0nd/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ico-0.3.0/src/icondir.rs /home/kums0nd/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ico-0.3.0/src/image.rs /home/kums0nd/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ico-0.3.0/src/restype.rs
+
+/home/kums0nd/Dev/neumann/neumann-lm/rust/target/debug/deps/libico-5234ca68ab3fc9d8.rlib: /home/kums0nd/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ico-0.3.0/src/lib.rs /home/kums0nd/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ico-0.3.0/src/macros.rs /home/kums0nd/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ico-0.3.0/src/bmpdepth.rs /home/kums0nd/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ico-0.3.0/src/icondir.rs /home/kums0nd/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ico-0.3.0/src/image.rs /home/kums0nd/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ico-0.3.0/src/restype.rs
+
+/home/kums0nd/Dev/neumann/neumann-lm/rust/target/debug/deps/ico-5234ca68ab3fc9d8.d: /home/kums0nd/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ico-0.3.0/src/lib.rs /home/kums0nd/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ico-0.3.0/src/macros.rs /home/kums0nd/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ico-0.3.0/src/bmpdepth.rs /home/kums0nd/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ico-0.3.0/src/icondir.rs /home/kums0nd/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ico-0.3.0/src/image.rs /home/kums0nd/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ico-0.3.0/src/restype.rs
+
+/home/kums0nd/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ico-0.3.0/src/lib.rs:
+/home/kums0nd/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ico-0.3.0/src/macros.rs:
+/home/kums0nd/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ico-0.3.0/src/bmpdepth.rs:
+/home/kums0nd/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ico-0.3.0/src/icondir.rs:
+/home/kums0nd/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ico-0.3.0/src/image.rs:
+/home/kums0nd/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ico-0.3.0/src/restype.rs:
