@@ -110,6 +110,18 @@ class NeumannSite {
     userInput.addEventListener("keydown", this.chatHandler.bind(this));
   }
 
+  removeWelcomeMessage(chatName) {
+    /*
+     *  Remove the welcome message at the top of the page.
+     *
+     *  Parameters:
+     *    chatName: The name of the chat that will be seen.
+     */
+    // TODO: Add nice animation.
+    const welcomeMessage = document.getElementById("welcome-message");
+    welcomeMessage.textContent = chatName;
+  }
+
   chatHandler(event) {
     /*
      *  Handle key events.
@@ -123,6 +135,7 @@ class NeumannSite {
         let message = userInput.innerText;
         if (this.chatType == Tokens["NEW_CHAT"] && message.length > 0) {
           this.chatType = Tokens["CHAT_ACTIVE"];
+          this.removeWelcomeMessage(message);
           this.currentChatName = message;
           console.log(
             `${NeumannSite.name}: A new conversation '${this.currentChatName}'`,

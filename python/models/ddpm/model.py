@@ -1,33 +1,50 @@
 from typing import List, Optional, Tuple, Union
 import torch
+from torch._prims_common import DeviceLikeType
 import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
 
-_device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 class Swish(nn.Module):
+    """
+        Swish class
+    """
     def __init__(self):
         super().__init__()
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """
+          Forward pass for the Swish class.
+
+          Arguments:
+            x: The input tensor.
+
+          Returns:
+            The input tensor multiplied by the input tensor with applied 
+            sigmoid function. 
+        """
         return x * torch.sigmoid(x)
 
 
 class PosEmbedding(nn.Module):
-    def __init__(self, n_channels: int):
-        super().__init__()
+    def __init__(self, n_channels: int, device: DeviceLikeType):
         """
-        Positional Embedding (Time embedding) for UNet
-        """
-        self.n_channels = n_channels
-        self.swish = Swish()
-        self.linear1 = nn.Linear(self.n_channels // 4, self.n_channels)
-        self.linear2 = nn.Linear(self.n_channels, self.n_channels)
+            Implements Positional Embedding (Time Embedding) for UNet.
 
-    def forward(self, x):
-        half_dim = self.n_channels // 8
+            Parameters:
+                n_channels: The number of channels in tensor.
+        """
+        super().__init__()
+        self.device: DeviceLikeType = device
+        self.n_channels: int = n_channels
+        self.swish: Swish = Swish()
+        self.linear1: nn.Linear = nn.Linear(self.n_channels // 4, self.n_channels)
+        self.linear2: nn.Linear = nn.Linear(self.n_channels, self.n_channels)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        half_dim: int = self.n_channels >> 3
         emb = np.log(10000) // (half_dim - 1)
-        emb = torch.exp(torch.arange(half_dim, device=_device) * -emb)
+        emb = torch.exp(torch.arange(half_dim, device=self.device) * -emb)
         emb = x[:, None] * emb[None, :]
         emb = torch.cat((emb.sin(), emb.cos()), dim=1)
         emb = self.swish(self.linear1(emb))
@@ -39,13 +56,22 @@ class ResidualBlock(nn.Module):
     def __init__(
         self, in_channels, out_channels, time_channels, n_groups=32, dropout=0.1
     ):
+        """
+            Implementation of Residual Blocks.
+
+            Attributes:
+                GroupNorms, Swish implementation can be found in this file.
+                The implementation follows the research paper:
+                    Attention Is All You Need.
+        """
         super().__init__()
-        self.gnorm1 = nn.GroupNorm(n_groups, in_channels)
-        self.conv1 = nn.Conv2d(in_channels, out_channels, kernel_size=3, padding=1)
-        self.gnorm2 = nn.GroupNorm(n_groups, out_channels)
-        self.conv2 = nn.Conv2d(out_channels, out_channels, kernel_size=3, padding=1)
-        self.swish = Swish()
-        self.dropout = nn.Dropout(dropout)
+        self.gnorm1: nn.GroupNorm = nn.GroupNorm(n_groups, in_channels)
+        self.conv1: nn.Conv2d = nn.Conv2d(in_channels, out_channels, kernel_size=3, padding=1)
+        self.gnorm2: nn.GroupNorm = nn.GroupNorm(n_groups, out_channels)
+        self.conv2: nn.Conv2d = nn.Conv2d(out_channels, out_channels, kernel_size=3, padding=1)
+        self.swish: Swish = Swish()
+        self.dropout: nn.Dropout = nn.Dropout(dropout)
+
         if in_channels != out_channels:
             self.shortcut = nn.Conv2d(in_channels, out_channels, kernel_size=1)
         else:

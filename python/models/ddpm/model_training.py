@@ -1,4 +1,4 @@
-from ddpm_model.ddpm import DenoiseModel, UNet
+from models.ddpm.model import DenoiseModel, UNet
 import torchvision
 from torchvision.utils import save_image
 import torch
@@ -6,7 +6,7 @@ from torch.utils.data import DataLoader
 from torch.optim import Adam
 import time
 import logging
-from dset import FileManager
+from dataset.dataset import FileManager
 
 logger = logging.getLogger(__name__)
 _device = torch.device("cuda" if torch.cuda.is_available() else "cpu")

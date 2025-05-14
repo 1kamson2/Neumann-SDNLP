@@ -1,16 +1,12 @@
 import torch
 import logging
 from enum import Enum
-from nlp_model.nlp import sub_mask
+from models.nlp.model import sub_mask
 import torch.nn as nn
 from torch.nn.functional import pad
 import torchtext.datasets as datasets
-import spacy
-import os
-from os.path import exists
 from torchtext.data.functional import to_map_style_dataset
 from torch.utils.data import DataLoader
-from torchtext.vocab import build_vocab_from_iterator
 from torch.utils.data.distributed import DistributedSampler
 from pathlib import Path
 
@@ -92,16 +88,17 @@ class Loss:
 
 class Batch:
   def __init__(
-    self, src, trg, pad=2, finit=False
-  ):  # Default padding is <blank>
+    self, src, tgt, pad=2, finit=False
+  ):  
+    # Default padding is <blank>
     if finit is False:
       self.src = src
       self.src_mask = (src != pad).unsqueeze(-2)
-      if trg is not None:
-        self.trg = trg[:, :-1]
-        self.trg_y = trg[:, 1:]
-        self.trg_mask = self.make_std_mask(self.trg, pad)
-        self.ntokens = (self.trg_y != pad).data.sum()
+      if tgt is not None:
+        self.tgt = tgt[:, :-1]
+        self.tgt_y = tgt[:, 1:]
+        self.tgt_mask = self.make_std_mask(self.tgt, pad)
+        self.n_toks = (self.tgt_y != pad).data.sum()
 
   @staticmethod
   def make_std_mask(trg, pad):
@@ -215,76 +212,6 @@ class Batch:
     )
     return train_dl, valid_dl
 
-
-class Tokenizer:
-  @staticmethod
-  def get_tokens():
-    try:
-      vocab2dec = spacy.load("de_core_news_sm")
-    except IOError:
-      os.system("python -m spacy download de_core_news_sm")
-      vocab2dec = spacy.load("de_core_news_sm")
-
-    try:
-      vocab2enc = spacy.load("en_core_web_sm")
-    except IOError:
-      os.system("python -m spacy download en_core_web_sm")
-      vocab2enc = spacy.load("en_core_web_sm")
-
-    return vocab2dec, vocab2enc
-
-  @staticmethod
-  def tokenize(text, tokenizer):
-    return [tok.text for tok in tokenizer.tokenizer(text)]
-
-  @staticmethod
-  def yield_tokens(data_iter, tokenizer, index):
-    for from_to_tuple in data_iter:
-      yield tokenizer(from_to_tuple[index])
-
-  @staticmethod
-  def build_vocabulary(vocab2dec, vocab2enc):
-    def tokenize_dec(text):
-      return Tokenizer.tokenize(text, vocab2dec)
-
-    def tokenize_enc(text):
-      return Tokenizer.tokenize(text, vocab2enc)
-
-    train, val, test = datasets.Multi30k(language_pair=("de", "en"))
-    vocab_src = build_vocab_from_iterator(
-      Tokenizer.yield_tokens(train + val + test, tokenize_dec, index=0),
-      min_freq=2,
-      specials=["<s>", "</s>", "<blank>", "<unk>"],
-    )
-    logger.info("German vocabulary built.")
-    vocab_trg = build_vocab_from_iterator(
-      Tokenizer.yield_tokens(train + val + test, tokenize_enc, index=1),
-      min_freq=2,
-      specials=["<s>", "</s>", "<blank>", "<unk>"],
-    )
-    logger.info("English vocabulary built.")
-    vocab_src.set_default_index(vocab_src["<unk>"])
-    vocab_trg.set_default_index(vocab_trg["<unk>"])
-
-    return vocab_src, vocab_trg
-
-  @staticmethod
-  def get_vocab():
-    VOCABULARY_PATH = FileManager().python_data_catalog
-    if not exists(VOCABULARY_PATH):
-      logger.info(f"{VOCABULARY_PATH} not detected. Downloading...")
-      vocab2dec, vocab2enc = Tokenizer.get_tokens()
-      vocab_src, vocab_trg = Tokenizer.build_vocabulary(vocab2dec, vocab2enc)
-      torch.save((vocab_src, vocab_trg), FileManager().python_data)
-      logger.info(f"{VOCABULARY_PATH} saved.")
-    else:
-      vocab_src, vocab_trg = torch.load(VOCABULARY_PATH)
-      logger.info(f"{VOCABULARY_PATH} loaded.")
-
-    logger.info("Vocabulary has been created:")
-    logger.info(f"-- Source vocabulary: {len(vocab_src)}")
-    logger.info(f"-- Target vocabulary: {len(vocab_trg)}")
-    return vocab_src, vocab_trg
 
 
 """

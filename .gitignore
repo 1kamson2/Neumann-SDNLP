@@ -1,6 +1,7 @@
 # General
 .git/
 .vscode/
+
 # python
 .mypy_cache/
 __pycache__/
@@ -9,6 +10,7 @@ python/data/*
 *.png 
 *.log
 *API*
+
 # rust
 rust/target/
 

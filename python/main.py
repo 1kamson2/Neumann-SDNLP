@@ -1,8 +1,7 @@
-from dset import *
-from beautifiers.info_wrappers import config_info
-from config import Config
+from dataset.dataset import *
+from utils.config.parse_config import get_config 
+from models.nlp.model_training import NLP
 import argparse
-from gpt_wrapper import *
 
 parser = argparse.ArgumentParser(prog="NeumannAI")
 parser.add_argument(
@@ -106,34 +105,17 @@ parser.add_argument(
 
 
 args = parser.parse_args()
-config_setup = Config(args)
-config_model = config_setup.get_config()
+config = get_config(args) 
 
 
-# **config_model might raise errors, but you can ignore it.
-@config_info(args.verbose, **config_model)
 def main():
-  """
-  WHAT TO FIX?
-  todo: NLP
-  todo: DDPM
-  todo: improve site
-  todo: make it read tokens
-  """
-  # nlp = NLP(**config_model)
-  # nlp.run_epoch()
+  nlp = NLP(**config)
+  nlp.run_training()
+  # TODO: Rewrite the tokenizers.
 
   # dif = DDPMApp()
   # dif.training()
   # dif.evaluate()
-  """
-    [WARNING]: FOR NOW USE ONLY CHAT GPT API, BECAUSE THERE ARE PROBLEMS WITH
-    THE ONES THAT ARE IN THIS PROJECT. NOTE THAT THE GPT'S API WILL BE USED IF
-    SOME OF FUNCTIONALITIES WILL FAIL
-    """
-
-  answer = gpt_client_run(args.prompt)
-  gpt_save_to_file(answer)
 
 
 if __name__ == "__main__":

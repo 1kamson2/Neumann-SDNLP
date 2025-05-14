@@ -1,5 +1,5 @@
-from nlp_model.nlp import *
-from dset import FileManager, Tokenizer
+from models.nlp.model import *
+from dataset.dataset import FileManager, Tokenizer
 import torch
 import torch.nn as nn
 from torch.optim import Adam
@@ -46,7 +46,7 @@ class NLP:
     self.generator = Generator(config["dmodel"], voclen_trg)
     self.padding_idx = vocab_trg["<blank>"]
     self.model = Transformer(
-      NLPEncoder(
+      Encoder(
         EncoderLayer(
           config["dmodel"], c(self.attn), c(self.ffn), config["dropout"]
         ),
