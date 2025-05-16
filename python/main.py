@@ -103,7 +103,6 @@ parser.add_argument(
   "--prompt", help="Specify your prompt.", default="", type=str
 )
 
-
 args = parser.parse_args()
 config = get_config(args) 
 
@@ -111,7 +110,7 @@ config = get_config(args)
 def main():
   nlp = NLP(**config)
   nlp.run_training()
-  # TODO: Rewrite the tokenizers.
+  # TODO: Make easier configs
 
   # dif = DDPMApp()
   # dif.training()

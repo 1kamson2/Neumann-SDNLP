@@ -29,7 +29,7 @@ def get_config(args: Namespace | None) -> Dict:
     """
         Get config for NLP or DDP model.
 
-        Parameters:
+        Arguments:
             args: All arguments passed through argparse.
 
         Returns:

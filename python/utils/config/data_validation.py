@@ -1,9 +1,9 @@
 from typing import Dict, List, Tuple
 
 IMPLEMENTED_MODELS: Tuple = ("nlp", "ddpm", "all")
-TRAINING_NLPM_TOKENS: Tuple = ("model", "imgchannels", "imgsize", 
+TRAINING_DDPM_TOKENS: Tuple = ("model", "imgchannels", "imgsize", 
                                "nchannels", "nsteps")
-TRAINING_DDPM_TOKENS: Tuple = ("model", "dmodel", "N", "dffn", "h",
+TRAINING_NLPM_TOKENS: Tuple = ("model", "dmodel", "N", "dffn", "h",
                                "prompt", "dropout", "nsamples")
 
 

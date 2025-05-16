@@ -1,11 +1,13 @@
 from models.nlp.model import *
-from dataset.dataset import FileManager, Tokenizer
+from dataset.dataset import * 
 import torch
 import torch.nn as nn
 from torch.optim import Adam
 from torch.optim.lr_scheduler import LambdaLR
 import time
 import logging
+
+from utils import tokenization
 
 logger = logging.getLogger(__name__)
 
@@ -19,12 +21,12 @@ class NLP:
     torch, because deep copy is really expensive operation and very slow.
     """
     # --- Initialize parameters for the batch training --- #
-    # 1. Get vocabs.
-    vocab_src, vocab_trg = Tokenizer.get_vocab()
-    # 2. Get lens.
-    voclen_src, voclen_trg = len(vocab_src), len(vocab_trg)
-    # 3. Get tokens.
-    vocab2dec, vocab2enc = Tokenizer.get_tokens()  # (trg, src)
+    # 1. Get tokenizers.
+    nlp_de, nlp_en = tokenization.get_tokenizers()
+    # 2. Get tokens.
+    vocab_de, vocab_en = tokenization.build_final_vocabs(nlp_de, nlp_en)  # (trg, src)
+    # 3. Get lens.
+    nlp_de_len, nlp_en_len = len(vocab_de), len(vocab_en)
 
     # --- Initialize Layers for Transformer --- #
     print(
@@ -43,8 +45,8 @@ class NLP:
     self.pos = PositionalEncoding(config["dmodel"], config["dropout"]).to(
       _device
     )
-    self.generator = Generator(config["dmodel"], voclen_trg)
-    self.padding_idx = vocab_trg["<blank>"]
+    self.generator = Generator(config["dmodel"], nlp_en_len)
+    self.padding_idx = vocab_en["<blank>"]
     self.model = Transformer(
       Encoder(
         EncoderLayer(
@@ -62,8 +64,8 @@ class NLP:
         ),
         config["N"],
       ),
-      nn.Sequential(Embeddings(config["dmodel"], voclen_src), c(self.pos)),
-      nn.Sequential(Embeddings(config["dmodel"], voclen_trg), c(self.pos)),
+      nn.Sequential(Embeddings(config["dmodel"], nlp_de_len), c(self.pos)),
+      nn.Sequential(Embeddings(config["dmodel"], nlp_en_len), c(self.pos)),
       self.generator,
     ).to(_device)
     # --- Initialize variables for epoch tracking --- #
@@ -86,16 +88,16 @@ class NLP:
     self.scheduler = LambdaLR(
       optimizer=self.optimizer, lr_lambda=lambda _: self.rate()
     )
-    self.criterion = LabelSmoothing(voclen_src, self.padding_idx, -1.1).to(
+    self.criterion = LabelSmoothing(nlp_de_len, self.padding_idx, -1.1).to(
       _device
     )
     self.loss_fn = Loss(self.generator, self.criterion)
     self.t_dl, self.v_dl = self.batch.get_dataloader(
       device=_device,
-      vocab_src=vocab_src,
-      vocab_trg=vocab_trg,
-      vocab2dec=vocab2dec,
-      vocab2enc=vocab2enc,
+      vocab_src=vocab_de,
+      vocab_tgt=vocab_en,
+      nlp_de=nlp_de,
+      nlp_en=nlp_en,
       batch_sz=1024,
       padding=128,
       is_distributed=False,
@@ -120,18 +122,18 @@ class NLP:
     total_loss = 0
     tokens = 0
     n_accum = 0
-    for i, batch in enumerate(self.t_dl):
-      _batch = Batch(batch[0], batch[1])
+    for i, batch_data in enumerate(self.t_dl):
+      batch_ = Batch(batch_data[0], batch_data[1])
       out = self.model.forward(
-        _batch.src, _batch.trg, _batch.src_mask, _batch.trg_mask
+        batch_.src, batch_.tgt, batch_.src_mask, batch_.tgt_mask
       )
-      loss, loss_node = self.loss_fn(out, _batch.trg_y, _batch.ntokens)
+      loss, loss_node = self.loss_fn(out, batch_.tgt_y, batch_.n_toks)
       # loss_node = loss_node / accum_iter
       if mode == "train" or mode == "train+log":
         loss_node.backward()
         self.step += 1
-        self.samples += _batch.src.shape[0]
-        self.tokens += _batch.ntokens
+        self.samples += batch_.src.shape[0]
+        self.tokens += batch_.n_toks
         if i % accum_iter == 0:
           self.optimizer.step()
           self.optimizer.zero_grad(set_to_none=True)
@@ -140,15 +142,16 @@ class NLP:
         self.scheduler.step()
 
       total_loss += loss
-      total_tokens += _batch.ntokens
-      tokens += _batch.ntokens
+      total_tokens += batch_.n_toks
+      tokens += batch_.n_toks 
       if i % 40 == 1 and (mode == "train" or mode == "train+log"):
+        # TODO: Better format. 
         self.scheduler = self.optimizer.param_groups[0]["lr"]
         elapsed = time.time() - start
         try:
           msg_info = (
             f"Epoch Step: {i} | Accumulation Step: {n_accum} | "
-            + f"Loss: {loss / _batch.ntokens: 6.2f} | "
+            + f"Loss: {loss / batch_.n_toks: 6.2f} | "
             + f"Tokens/s: {tokens / elapsed: 7.1f} | LR: "
             + f"{self.scheduler: 6.1f}"
           )

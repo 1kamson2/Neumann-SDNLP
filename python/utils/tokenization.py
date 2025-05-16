@@ -1,83 +1,97 @@
-from typing import List, Tuple
+from typing import Iterator, List, Tuple
 import spacy
-from spacy.vocab import Language
-from datasets import load_dataset
-def get_vocabs() -> Tuple[Language, Language]:
-  """
-    Load English Vocabulary and German Vocabulary. The English vocabulary will
-    be encoded and the German vocabulary will be decoded. 
+from spacy.language import Language
+from datasets import Dataset, DatasetDict, load_dataset
+from torchtext.vocab import Vocab, build_vocab_from_iterator 
 
+SPECIAL_TOKS: List = ["<s>", "</s>", "<blank>", "<unk>"]
+def get_tokenizers() -> Tuple[Language, Language]:
+  """
+    Load English and German Tokenizer. 
     Returns:
-      Vocabularies in the following order:
-        German, English.
-  """
-  de_vocab: Language = spacy.load("de_core_news_sm")
-  en_vocab: Language = spacy.load("en_core_web_sm")
-  return de_vocab, en_vocab
+      German Tokenizer, English Tokenizer.
 
-def tokenize(content: str, vocab: Language) -> List:
+  """
+  nlp_de: Language = spacy.load("de_core_news_sm")
+  nlp_en: Language = spacy.load("en_core_web_sm")
+  return nlp_de, nlp_en
+
+def tokenize(content: str, nlp: Language) -> List:
   """
     Tokenize the text using the given vocabulary.
 
     Arguments:
       content: The text that will be tokenized.
-      vocab: The vocabulary that will be used to tokenize the text.
+      nlp: The Tokenizer that will be used to tokenize the text.
 
     Returns:
       List of tokens.
   """
-  return [tok.text for tok in vocab.tokenizer(content)]
+  return [tok.text for tok in nlp.tokenizer(content)]
 
-def yield_tokens(all_toks, vocab, index):
-  for from_to_tuple in all_toks:
-    yield vocab(from_to_tuple[index])
+def yield_tokens(toks: List, nlp: Language) -> Iterator:
+  """
+    Build the generator from tokens.
+    
+    Arguments:
+      toks: List of tokens.
+      nlp: Tokenizer to tokenize.
+
+    Returns:
+      Generator of tokens.
+  """
+  for tok_str in toks:
+    yield nlp(tok_str)
 
 
-def build_final_vocabs(vocab_decoder: Language, vocab_encoder: Language):
+def build_final_vocabs(nlp_de: Language, nlp_en: Language) -> Tuple[Vocab, Vocab]:
   """
     Build the source and target vocabularies that will be used in training the
     model.
 
     Arguments:
-      vocab_decoder: The vocabulary that will be used for decoding.
-      vocab_encoder: The vocabulary that will be used for encoding.
+      nlp_de: The vocabulary that will be used for decoding.
+      nlp_en: The vocabulary that will be used for encoding.
 
     Returns:
-      ???
+      English Vocabulary and German Vocabulary.
   """
-  # TODO: REMOVE
-  # def tokenize_dec(text):
-  #   return Tokenizer.tokenize(text, vocab2dec)
-  #
-  # def tokenize_enc(text):
-  #   return Tokenizer.tokenize(text, vocab2enc)
 
   # No split yields to DatasetDict
-  data_dict = load_dataset("bentrevett/multi30k") 
+  dataset_pair = load_dataset("bentrevett/multi30k") 
+
+  assert isinstance(dataset_pair, DatasetDict)
+  train: Dataset = dataset_pair["train"] 
+  # TODO: Find a way to add those datasets.
+  validation: Dataset = dataset_pair["validation"] 
+  test: Dataset = dataset_pair["test"] 
 
   # TODO: Find out what does the adding of all sets do.
   vocab_src = build_vocab_from_iterator(
-    yield_tokens(train, vocab_decoder, index=0),
+    yield_tokens(train["en"], nlp_de),
     min_freq=2,
-    specials=["<s>", "</s>", "<blank>", "<unk>"],
+    specials=SPECIAL_TOKS,
   )
-  logger.info("German vocabulary built.")
+
   vocab_tgt = build_vocab_from_iterator(
-    yield_tokens(train + validation + test, tokenize_enc, index=1),
+    yield_tokens(train["de"], nlp_en),
     min_freq=2,
-    specials=["<s>", "</s>", "<blank>", "<unk>"],
+    specials=SPECIAL_TOKS,
   )
-  logger.info("English vocabulary built.")
+
   vocab_src.set_default_index(vocab_src["<unk>"])
   vocab_tgt.set_default_index(vocab_tgt["<unk>"])
-
   return vocab_src, vocab_tgt
 
-def get_vocab():
+def load_local_vocabulary() -> Tuple[Vocab, Vocab]:
+  """
+    Load vocabularies from the catalog.
+  """
+  assert 1 == 2, "NOT IMPLEMENTED"
   VOCABULARY_PATH = FileManager().python_data_catalog
   if not exists(VOCABULARY_PATH):
     logger.info(f"{VOCABULARY_PATH} not detected. Downloading...")
-    vocab2dec, vocab2enc = Tokenizer.get_tokens()
+    vocab2dec, vocab2enc = get_tokenizers()
     vocab_src, vocab_trg = Tokenizer.build_vocabulary(vocab2dec, vocab2enc)
     torch.save((vocab_src, vocab_trg), FileManager().python_data)
     logger.info(f"{VOCABULARY_PATH} saved.")

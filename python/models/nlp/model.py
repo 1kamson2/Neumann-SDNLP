@@ -1,24 +1,29 @@
 import math
-from typing import Any, Callable, List, Tuple
+from typing import Callable, List, Tuple
 from numpy._typing import _UnknownType
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import copy
 
-def deep_copy_module(module: Callable, n: int, *args) -> List[Any]:
+def deep_copy_module(module: Callable | nn.Module, n: int, *args) -> List:
   """
     Deep copies of any module n times.
     
     Arguments:
-        module: The module that will be copied.
+        module: The module that will be copied, it can be either a constructor
+                or initiated class.
         n: The number of copies.
         args: Pass the arguments that will be used for the module.
 
     Returns:
       The list of the copied modules.
   """
-  return [copy.deepcopy(module(*args)) for _ in range(n)]
+  if isinstance(module, nn.Module):
+    return [copy.deepcopy(module) for _ in range(n)]
+
+  base_instance: Callable = module(*args)
+  return [copy.deepcopy(base_instance) for _ in range(n)]
 
 
 class Generator(nn.Module):
@@ -154,7 +159,7 @@ class Encoder(nn.Module):
     """
     super().__init__()
     self.layers: nn.ModuleList = nn.ModuleList(deep_copy_module(layer, n))
-    self.norm: LayerNorm = LayerNorm(layer.sz)
+    self.norm: LayerNorm = LayerNorm(layer.size)
 
   def forward(self, x: torch.Tensor, mask: _UnknownType) -> torch.Tensor:
     """
@@ -186,8 +191,6 @@ class DecoderLayer(nn.Module):
         src_attention: The source Multihead Attention, for the DecoderLayer.
         feed_forward_network: The Feed Forward Network for the Decoder Layer
         sublayers: All Sublayer connections for the DecoderLayer.
-
-
     """
     super().__init__()
     self.size: int = size
@@ -199,7 +202,7 @@ class DecoderLayer(nn.Module):
       )
 
   def forward(self, x: torch.Tensor, mem: torch.Tensor, 
-              src_mask: torch.Tensor, trg_mask: torch.Tensor) -> torch.Tensor:
+              src_mask: torch.Tensor, tgt_mask: torch.Tensor) -> torch.Tensor:
     """
       Forward pass for the Decoder class.
 
@@ -207,13 +210,13 @@ class DecoderLayer(nn.Module):
         x: Input tensor.
         mem: 
         src_mask: Mask for the Encoder Layers.
-        trg_mask
+        tgt_mask
 
       Returns:
         Output tensor.
     """
 
-    x = self.sublayers[0](x, lambda x: self.attention(x, x, x, trg_mask))
+    x = self.sublayers[0](x, lambda x: self.attention(x, x, x, tgt_mask))
     x = self.sublayers[1](x, lambda x: self.src_attention(x, mem, mem, src_mask))
     return self.sublayers[2](x, self.feed_forward_network)
 
@@ -230,7 +233,7 @@ class NLPDecoder(nn.Module):
     super().__init__()
     self.use_cuda = torch.cuda.is_available()
     self.layers: List = deep_copy_module(layer, n)
-    self.norm = LayerNorm(layer.sz)
+    self.norm = LayerNorm(layer.size)
 
   def forward(self, x, mem, src_mask, trg_mask):
     """
@@ -281,8 +284,8 @@ class Transformer(nn.Module):
     return self.decode(self.encode(src, src_mask), src_mask, trg, trg_mask)
 
 
-def sub_mask(sz):
-  attn_shape = (1, sz, sz)
+def sub_mask(size: int):
+  attn_shape = (1, size, size)
   mask = torch.triu(torch.ones(attn_shape), diagonal=1).type(torch.uint8)
   return mask == 0
 
@@ -383,3 +386,4 @@ class FeedForwardNetwork(nn.Module):
     out = F.relu(out)
     out = self.dropout(out)
     return self.w2(out)
+

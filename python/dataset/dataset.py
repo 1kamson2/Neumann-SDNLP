@@ -1,14 +1,19 @@
+from typing import List
+from datasets import Dataset, load_dataset
+from spacy.language import Language
 import torch
 import logging
 from enum import Enum
+from torch._prims_common import DeviceLikeType
+from torchtext.vocab import Vocab
 from models.nlp.model import sub_mask
 import torch.nn as nn
 from torch.nn.functional import pad
-import torchtext.datasets as datasets
 from torchtext.data.functional import to_map_style_dataset
 from torch.utils.data import DataLoader
 from torch.utils.data.distributed import DistributedSampler
 from pathlib import Path
+from utils.tokenization import tokenize
 
 """
     THIS SHOULD BE ONLY USED ON WINDOWS (IS THAT EVEN TRUE?) 
@@ -21,11 +26,6 @@ class DataType(Enum):
   TRAINING = 0
   VALIDATION = 1
   TEST = 2
-
-
-class Language(Enum):
-  SRC = "source"
-  TRG = "target"
 
 
 class FileManager:
@@ -101,121 +101,110 @@ class Batch:
         self.n_toks = (self.tgt_y != pad).data.sum()
 
   @staticmethod
-  def make_std_mask(trg, pad):
+  def make_std_mask(tgt, pad):
     "Create a mask to hide padding and future words."
-    trg_mask = (trg != pad).unsqueeze(-2)
-    trg_mask = trg_mask & sub_mask(trg.size(-1)).type_as(trg_mask.data)
-    return trg_mask
+    tgt_mask = (tgt != pad).unsqueeze(-2)
+    tgt_mask = tgt_mask & sub_mask(tgt.size(-1)).type_as(tgt_mask.data)
+    return tgt_mask
 
   def collate_batch(
     self,
     batch,
-    src_pipeline,
-    trg_pipeline,
-    src_vocab,
-    trg_vocab,
-    device,
-    padding=128,
-    pad_id=2,
+    nlp_src: Language,
+    nlp_tgt: Language,
+    vocab_src: Vocab,
+    vocab_tgt: Vocab,
+    device: DeviceLikeType,
+    padding: int = 128,
+    pad_id: int = 2,
   ):
     bs_id = torch.tensor([0], device=device)  # <s> token ID
     eos_id = torch.tensor([1], device=device)  # </s> token ID
-    src_list, trg_list = [], []
+    src_toks, tgt_toks = [], []
 
-    for _src, _trg in batch:
+    for src_tok, tgt_tok in batch:
       processed_src = torch.cat(
         [
           bs_id,
           torch.tensor(
-            src_vocab(src_pipeline(_src)), dtype=torch.int64, device=device
+            vocab_src(nlp_src(src_tok)), dtype=torch.int64, device=device
           ),
           eos_id,
         ],
         0,
       )
-      processed_trg = torch.cat(
+      processed_tgt = torch.cat(
         [
           bs_id,
           torch.tensor(
-            trg_vocab(trg_pipeline(_trg)), dtype=torch.int64, device=device
+            vocab_tgt(nlp_tgt(tgt_tok)), dtype=torch.int64, device=device
           ),
           eos_id,
         ],
         0,
       )
-      src_list.append(
+      src_toks.append(
         pad(processed_src, (0, padding - len(processed_src)), value=pad_id)
       )
-      trg_list.append(
-        pad(processed_trg, (0, padding - len(processed_trg)), value=pad_id)
+      tgt_toks.append(
+        pad(processed_tgt, (0, padding - len(processed_tgt)), value=pad_id)
       )
 
-    src = torch.stack(src_list)
-    trg = torch.stack(trg_list)
-    return src, trg
+    return torch.stack(src_toks), torch.stack(tgt_toks)
 
   def get_dataloader(
     self,
-    device,
-    vocab_src,
-    vocab_trg,
-    vocab2dec,
-    vocab2enc,
-    batch_sz=12000,
-    padding=128,
-    is_distributed=True,
+    device: DeviceLikeType,
+    vocab_src: Vocab,
+    vocab_tgt: Vocab,
+    nlp_de: Language,
+    nlp_en: Language,
+    batch_sz: int = 12000,
+    padding: int = 128,
+    is_distributed: bool = True,
   ):
-    # Tokenizer functions
-    def tokenize_de(text):
-      return Tokenizer.tokenize(text, vocab2dec)
+    def __de_pipeline(text: str) -> List:
+      return tokenize(text, nlp_de)
 
-    def tokenize_en(text):
-      return Tokenizer.tokenize(text, vocab2enc)
+    def __en_pipeline(text: str) -> List:
+      return tokenize(text, nlp_en)
 
-    def collate_fn(batch):
+    def __collate_fn(batch):
       return self.collate_batch(
         batch,
-        tokenize_de,
-        tokenize_en,
+        __de_pipeline,
+        __en_pipeline,
         vocab_src,
-        vocab_trg,
+        vocab_tgt,
         device,
         padding=padding,
         pad_id=2,
       )
 
-    train_iter = datasets.Multi30k(split="train", language_pair=("de", "en"))
-    valid_iter = datasets.Multi30k(split="valid", language_pair=("de", "en"))
-
+    train_iter = load_dataset("bentrevett/multi30k", split="train") 
+    valid_iter = load_dataset("bentrevett/multi30k", split="validation") 
+    assert isinstance(train_iter, Dataset)
+    assert isinstance(valid_iter, Dataset)
     train_iter_map = to_map_style_dataset(train_iter)
+    valid_iter_map = to_map_style_dataset(valid_iter)
     train_sampler = (
       DistributedSampler(train_iter_map) if is_distributed else None
     )
-    valid_iter_map = to_map_style_dataset(valid_iter)
     valid_sampler = (
       DistributedSampler(valid_iter_map) if is_distributed else None
     )
-
     train_dl = DataLoader(
       train_iter_map,
       batch_size=batch_sz,
       shuffle=(train_sampler is None),
       sampler=train_sampler,
-      collate_fn=collate_fn,
+      collate_fn=__collate_fn,
     )
     valid_dl = DataLoader(
       valid_iter_map,
       batch_size=batch_sz,
       shuffle=(valid_sampler is None),
       sampler=valid_sampler,
-      collate_fn=collate_fn,
+      collate_fn=__collate_fn,
     )
     return train_dl, valid_dl
-
-
-
-"""
-KNOWN ISSUES:
-> https://github.com/pytorch/text/issues/2221
-  Might be issue with downloading test data.
-"""
