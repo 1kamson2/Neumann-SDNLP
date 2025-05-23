@@ -22,6 +22,7 @@ def user_config_validation(*, config: Dict) -> bool:
     config_keys: List = list(config.keys())
     model: str | None = config.get("model", None)
     if model not in IMPLEMENTED_MODELS:
+        print(f"[ERROR] {model} is not in the {IMPLEMENTED_MODELS}")
         return False
 
     match model:
@@ -30,8 +31,8 @@ def user_config_validation(*, config: Dict) -> bool:
         case "nlp":
             return len(TRAINING_NLPM_TOKENS) <= len(config_keys) 
         case "all":
-            return (len(TRAINING_DDPM_TOKENS) + len(TRAINING_NLPM_TOKENS) ==
-                    len(config_keys))
+            ALL_TOKS: set = set(TRAINING_DDPM_TOKENS + TRAINING_NLPM_TOKENS)
+            return (len(ALL_TOKS) == len(config_keys))
         case _:
             return False
     

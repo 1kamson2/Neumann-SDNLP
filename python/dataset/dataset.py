@@ -12,7 +12,6 @@ from torch.nn.functional import pad
 from torchtext.data.functional import to_map_style_dataset
 from torch.utils.data import DataLoader
 from torch.utils.data.distributed import DistributedSampler
-from pathlib import Path
 from utils.tokenization import tokenize
 
 """
@@ -26,21 +25,6 @@ class DataType(Enum):
   TRAINING = 0
   VALIDATION = 1
   TEST = 2
-
-
-class FileManager:
-  root_project_path: Path = Path(
-    "/home/kums0n-desktop/Dev/lm-project/neumann-lm/"
-  )
-  python_catalog: Path = root_project_path.joinpath("python/")
-  python_data_catalog: Path = python_catalog.joinpath("data/spacy_vocab.pt")
-  gpt_out_path: Path = python_catalog.joinpath("GPT_OUT")
-  gpt_api_path: Path = python_catalog.joinpath("API_KEY")
-  unet_weights_path: Path = python_catalog.joinpath("weights/UNET_WEIGHTS.pth")
-  ddpm_weights_path: Path = python_catalog.joinpath("weights/DDPM_WEIGHTS.pth")
-  transformer_weights_path: Path = python_catalog.joinpath(
-    "weights/TRANSFORMER_WEIGHTS.pth"
-  )
 
 
 class LabelSmoothing(nn.Module):
@@ -161,12 +145,30 @@ class Batch:
     nlp_en: Language,
     batch_sz: int = 12000,
     padding: int = 128,
-    is_distributed: bool = True,
+    is_distributed: bool = False,
   ):
     def __de_pipeline(text: str) -> List:
+      """
+        Wrapper for the decode vocabulary tokenization, pipeline. 
+
+        Arguments:
+          text: Text used in pipeline. 
+
+        Returns:
+          List of tokens. 
+      """
       return tokenize(text, nlp_de)
 
     def __en_pipeline(text: str) -> List:
+      """
+        Wrapper for the encode vocabulary tokenization, pipeline. 
+
+        Arguments:
+          text: Text used in pipeline. 
+
+        Returns:
+          List of tokens. 
+      """
       return tokenize(text, nlp_en)
 
     def __collate_fn(batch):

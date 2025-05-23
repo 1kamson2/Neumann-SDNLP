@@ -44,7 +44,11 @@ def yield_tokens(toks: List, nlp: Language) -> Iterator:
     yield nlp(tok_str)
 
 
-def build_final_vocabs(nlp_de: Language, nlp_en: Language) -> Tuple[Vocab, Vocab]:
+def build_final_vocabs(
+  nlp_de: Language, 
+  nlp_en: Language, 
+  should_serialize: bool = True
+) -> Tuple[Vocab, Vocab]:
   """
     Build the source and target vocabularies that will be used in training the
     model.
@@ -81,7 +85,21 @@ def build_final_vocabs(nlp_de: Language, nlp_en: Language) -> Tuple[Vocab, Vocab
 
   vocab_src.set_default_index(vocab_src["<unk>"])
   vocab_tgt.set_default_index(vocab_tgt["<unk>"])
+
+  if should_serialize:
+    serialize_vocabulary(vocab_src)
+    serialize_vocabulary(vocab_tgt)
   return vocab_src, vocab_tgt
+
+
+def serialize_vocabulary(vocabulary: Vocab) -> None:
+  """
+    Serialize the vocabulary. 
+
+    Arguments:
+      vocabulary: The vocabulary to be saved.
+  """
+  
 
 def load_local_vocabulary() -> Tuple[Vocab, Vocab]:
   """

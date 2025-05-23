@@ -1,7 +1,9 @@
 from dataset.dataset import *
-from utils.config.parse_config import get_config 
-from models.nlp.model_training import NLP
+from utils.config.parse_config import get_model_configs 
 import argparse
+from pathlib import Path
+from utils.path_managing import fetch_paths, get_current_file_path
+from typing import Dict
 
 parser = argparse.ArgumentParser(prog="NeumannAI")
 parser.add_argument(
@@ -103,13 +105,23 @@ parser.add_argument(
   "--prompt", help="Specify your prompt.", default="", type=str
 )
 
+# Construct root catalog path. 
+ROOT_CATALOG_PATH: Path = get_current_file_path(__file__) 
+
+# Construct the rest of the important paths.
+PROJECT_PATHS: Dict = fetch_paths(ROOT_CATALOG_PATH)
+
 args = parser.parse_args()
-config = get_config(args) 
+config = get_model_configs(args) 
+config["paths"] = PROJECT_PATHS
 
 
 def main():
-  nlp = NLP(**config)
-  nlp.run_training()
+  # Get the parent path of this file.
+  # print(get_info(config))
+  # nlp = NLP(**config)
+  # nlp.run_training()
+  print(get_current_file_path(__file__))
   # TODO: Make easier configs
 
   # dif = DDPMApp()

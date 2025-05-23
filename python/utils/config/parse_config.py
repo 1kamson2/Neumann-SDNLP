@@ -24,8 +24,7 @@ def get_specific_toks(model: str) -> Tuple:
             return (None,) 
 
 
-
-def get_config(args: Namespace | None) -> Dict: 
+def get_model_configs(args: Namespace | None) -> Dict: 
     """
         Get config for NLP or DDP model.
 
@@ -45,3 +44,59 @@ def get_config(args: Namespace | None) -> Dict:
     }
     assert user_config_validation(config=cfg), "[ERROR] Incorrect config." 
     return cfg
+
+def get_info(config: Dict) -> str:
+    """
+        Return formatted info.
+
+        Arguments:
+            config: The config, whose information will be displayed. 
+
+        Returns:
+            Formatted string info.
+    """
+    info: str = ""
+    max_key_length: int = min(1 << 5, max([len(str(key)) for key in config.keys()]))
+    max_val_length: int = min(1 << 5, max([len(str(val)) for val in config.values()])) 
+
+    def trim_key_and_val(k: str, v: str) -> Tuple[str, str]:  
+        """
+            Inner function to handle dictionaries as values.
+
+            Arguments:
+                k: Key as str.
+                v: Value as str.
+
+            Returns:
+                Formatted key and value.
+        """
+        k = (k[:(max_key_length - 3)] + "..." if len(k) > max_key_length
+        else k) 
+        v = (v[:(max_val_length - 3)] + "..." if len(v) > max_val_length
+        else v) 
+        return (k, v)
+
+    def lex_and_parse_dict(inner: Dict) -> str:
+        """
+            Inner lexing and parsing function, handles dictionaries.
+
+            Arguments:
+                inner: Dictionary as value.
+
+            Returns:
+                Formatted dict.
+        """
+        info_inner: str = "" 
+        for k_, v_ in inner.items():
+            k_, v_ = trim_key_and_val(str(k_), str(v_))
+            info_inner += f"{k_:<{max_key_length}}  {v_:>{max_val_length}}\n"
+        return info_inner
+
+    for k, v in config.items():
+        if isinstance(v, Dict):
+            info += lex_and_parse_dict(v)
+            continue
+        k, v = trim_key_and_val(str(k), str(v))
+        info += f"{k:<{max_key_length}}  {v:>{max_val_length}}\n"
+    return info
+
